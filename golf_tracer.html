@@ -1,0 +1,2869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LINKS">
+<meta name="theme-color" content="#0a160b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='40' fill='%230a160b'/><circle cx='90' cy='72' r='28' fill='none' stroke='%23c8a84b' stroke-width='5'/><line x1='90' y1='100' x2='90' y2='140' stroke='%23c8a84b' stroke-width='3'/><circle cx='90' cy='93' r='6' fill='%23c8a84b'/></svg>">
+<title>LINKS — Golf Tracer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --green-deep:#0f2010;--green-mid:#1a3a1c;--green-fair:#2d5c2f;
+  --green-bright:#3d8c40;--green-light:#5ab85e;
+  --gold:#c8a84b;--gold-light:#e8ca6e;--gold-pale:#f5e8c0;
+  --cream:#f7f3e8;--white:#ffffff;
+  --dark:#0a160b;--dark2:#111d12;--dark3:#162518;
+  --text-primary:#f0ede4;--text-secondary:rgba(240,237,228,0.55);--text-muted:rgba(240,237,228,0.3);
+  --card:rgba(255,255,255,0.05);--card-border:rgba(255,255,255,0.1);
+  --glass:rgba(10,22,11,0.85);
+  --red:#e84c3d;--blue:#4ca8e8;--orange:#e8823d;
+  --r-sm:10px;--r-md:16px;--r-lg:22px;--r-xl:28px;
+  --shadow:0 8px 32px rgba(0,0,0,0.5)
+}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Outfit',sans-serif}
+#root{width:390px;height:844px;position:relative;margin:0 auto;background:var(--dark);overflow:hidden;border-radius:44px}
+
+/* ─── SCREENS ─── */
+.screen{position:absolute;inset:0;transition:transform .4s cubic-bezier(.4,0,.2,1),opacity .4s;will-change:transform}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
+.screen.slide-up{transform:translateY(100%);opacity:0;pointer-events:none}
+
+/* ─── COURSE SELECT ─── */
+#screen-courses{background:var(--dark);z-index:10}
+#cs-bg{position:absolute;inset:0;background:radial-gradient(ellipse 120% 60% at 50% 0%,#1e4020 0%,var(--dark) 65%)}
+#cs-header{padding:60px 28px 24px;position:relative;z-index:2}
+#cs-logo{font-family:'Playfair Display',serif;font-size:36px;font-weight:900;color:var(--gold-light);letter-spacing:2px;line-height:1}
+#cs-tagline{font-size:12px;letter-spacing:4px;text-transform:uppercase;color:var(--text-secondary);margin-top:6px}
+#cs-search{margin:0 24px 20px;position:relative;z-index:2}
+#cs-search input{width:100%;background:rgba(255,255,255,0.07);border:1px solid var(--card-border);border-radius:14px;padding:14px 20px 14px 48px;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:15px;outline:none}
+#cs-search input::placeholder{color:var(--text-muted)}
+#cs-search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:18px;opacity:0.4}
+#cs-list{overflow-y:auto;height:calc(844px - 220px);padding:0 20px 40px;position:relative;z-index:2}
+#cs-list::-webkit-scrollbar{display:none}
+.cs-section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);padding:8px 4px 10px;font-weight:600}
+.course-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r-lg);padding:18px 20px;margin-bottom:10px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:16px}
+.course-card:active{transform:scale(0.98);background:rgba(201,168,75,0.1);border-color:var(--gold)}
+.course-card-icon{width:48px;height:48px;border-radius:var(--r-sm);background:var(--green-fair);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.course-card-info{flex:1;min-width:0}
+.course-card-name{font-size:15px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.course-card-meta{font-size:12px;color:var(--text-secondary);margin-top:3px}
+.course-card-par{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold);flex-shrink:0}
+.course-card-par span{display:block;font-family:'Outfit',sans-serif;font-size:9px;color:var(--text-muted);text-align:center;letter-spacing:1px;margin-top:-2px}
+
+/* ─── MAIN TRACKER ─── */
+#screen-main{z-index:5}
+#map-canvas{position:absolute;inset:0}
+#map-ui{position:absolute;inset:0;pointer-events:none;z-index:10}
+
+/* Top HUD */
+#top-hud{position:absolute;top:0;left:0;right:0;padding:52px 20px 16px;background:linear-gradient(to bottom,rgba(0,0,0,0.8) 0%,transparent 100%);pointer-events:all}
+#hud-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+#back-btn{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+#course-pill{background:rgba(0,0,0,0.5);border:1px solid var(--card-border);border-radius:20px;padding:6px 14px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(12px)}
+#course-pill-name{font-size:12px;font-weight:600;color:var(--text-primary)}
+#course-pill-hole{font-size:11px;color:var(--gold);padding-left:8px;border-left:1px solid rgba(255,255,255,0.15)}
+#hud-stats{display:flex;gap:8px}
+.hud-stat{background:rgba(0,0,0,0.5);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:8px 14px;backdrop-filter:blur(12px);text-align:center;flex:1}
+.hud-stat-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold-light);line-height:1}
+.hud-stat-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
+
+/* Hole nav */
+#hole-nav{position:absolute;top:148px;left:20px;right:20px;display:flex;gap:6px;overflow-x:auto;pointer-events:all}
+#hole-nav::-webkit-scrollbar{display:none}
+.hole-pill{flex-shrink:0;background:rgba(0,0,0,0.5);border:1px solid var(--card-border);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s;backdrop-filter:blur(8px)}
+.hole-pill.active{background:var(--gold);border-color:var(--gold);color:#1a0f00}
+
+/* Map mode toggle */
+#map-mode-toggle{position:absolute;top:148px;right:20px;display:flex;background:rgba(0,0,0,0.6);border:1px solid var(--card-border);border-radius:20px;overflow:hidden;pointer-events:all;backdrop-filter:blur(12px)}
+.map-mode-btn{padding:7px 14px;font-size:11px;font-weight:600;color:var(--text-secondary);cursor:pointer;letter-spacing:.5px;transition:all .2s}
+.map-mode-btn.active{background:var(--gold);color:#1a0f00}
+
+/* Pin drop mode banner */
+#pin-mode-banner{position:absolute;top:200px;left:50%;transform:translateX(-50%);background:rgba(232,130,61,0.9);border-radius:20px;padding:8px 20px;font-size:12px;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase;backdrop-filter:blur(8px);pointer-events:all;cursor:pointer;display:none;white-space:nowrap}
+
+/* Shot list bottom drawer */
+#shot-drawer{position:absolute;bottom:0;left:0;right:0;pointer-events:all;z-index:20}
+#drawer-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:0 auto 12px}
+#drawer-inner{background:linear-gradient(to top,rgba(5,12,5,0.98) 0%,rgba(10,22,11,0.95) 100%);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:12px 20px 0;border-top:1px solid var(--card-border);backdrop-filter:blur(20px)}
+#drawer-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+#drawer-title{font-size:13px;font-weight:600;color:var(--text-secondary);letter-spacing:1px;text-transform:uppercase}
+#drawer-actions{display:flex;gap:8px}
+.drawer-action-btn{background:rgba(255,255,255,0.06);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:6px 14px;font-size:11px;font-weight:600;color:var(--text-primary);cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.drawer-action-btn.primary{background:var(--gold);border-color:var(--gold);color:#1a0f00}
+.drawer-action-btn:active{transform:scale(0.97)}
+#shots-list{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin:0 -4px;padding:0 4px 4px}
+#shots-list::-webkit-scrollbar{display:none}
+.shot-card{flex-shrink:0;background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:var(--r-md);padding:12px 14px;width:120px;cursor:pointer;transition:all .2s}
+.shot-card:active{transform:scale(0.96)}
+.shot-card-num{font-family:'Playfair Display',serif;font-size:28px;font-weight:900;line-height:1;color:var(--gold)}
+.shot-card-type{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+.shot-card-club{font-size:13px;font-weight:500;color:var(--text-secondary);margin-top:2px}
+.shot-card-dist{font-size:20px;font-weight:700;color:var(--text-primary);margin-top:6px;font-family:'Playfair Display',serif}
+.shot-card-dist span{font-size:11px;font-weight:400;color:var(--text-muted);font-family:'Outfit',sans-serif}
+#bottom-controls{display:flex;align-items:center;justify-content:space-between;padding:14px 4px 32px;margin-top:8px}
+#scorecard-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+#track-btn{width:72px;height:72px;border-radius:50%;background:var(--gold);border:none;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;cursor:pointer;transition:all .3s;box-shadow:0 0 0 0 rgba(200,168,75,0.4)}
+#track-btn.tracking{background:var(--red);box-shadow:0 0 0 8px rgba(232,76,61,0.15),0 0 20px rgba(232,76,61,0.2)}
+#track-btn.tracking:hover{box-shadow:0 0 0 12px rgba(232,76,61,0.1)}
+#track-btn .tb-icon{font-size:24px;line-height:1}
+#track-btn .tb-label{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(26,15,0,0.8)}
+#track-btn.tracking .tb-label{color:rgba(255,255,255,0.8)}
+#pin-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;transition:all .2s}
+#pin-btn.active{background:rgba(232,130,61,0.2);border-color:var(--orange)}
+
+/* GPS status */
+#gps-status{position:absolute;bottom:220px;left:50%;transform:translateX(-50%);pointer-events:none;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.6);border:1px solid var(--card-border);border-radius:20px;padding:8px 16px;backdrop-filter:blur(12px)}
+#gps-dot{width:8px;height:8px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px #4caf50}
+#gps-dot.searching{background:var(--gold);box-shadow:0 0 6px var(--gold);animation:pulse-dot .8s infinite alternate}
+#gps-dot.stopped{background:var(--red);box-shadow:0 0 6px var(--red)}
+@keyframes pulse-dot{from{opacity:0.4}to{opacity:1}}
+#gps-text{font-size:11px;color:var(--text-secondary);font-weight:500}
+
+/* Countdown floating card */
+#countdown-card{position:absolute;left:20px;right:20px;bottom:230px;background:rgba(5,12,5,0.95);border:1px solid rgba(201,168,75,0.3);border-radius:var(--r-lg);padding:16px 20px;pointer-events:all;display:none;backdrop-filter:blur(20px);z-index:30}
+#countdown-card.show{display:block;animation:slide-up-fade .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes slide-up-fade{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+#cd-row{display:flex;align-items:center;gap:16px}
+#cd-svg{width:52px;height:52px;flex-shrink:0}
+#cd-info{flex:1}
+#cd-headline{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:3px}
+#cd-sub{font-size:12px;color:var(--text-secondary)}
+#cd-skip{background:rgba(255,255,255,0.08);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:6px 14px;font-size:11px;font-weight:700;color:var(--text-primary);cursor:pointer;letter-spacing:.5px;white-space:nowrap;transition:all .2s}
+#cd-skip:active{transform:scale(0.96)}
+#cd-dismiss{margin-top:12px;text-align:center;font-size:11px;color:var(--text-muted);cursor:pointer;padding:4px}
+
+/* ─── SHOT MODAL ─── */
+#modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:50;display:none;align-items:flex-end}
+#modal-backdrop.show{display:flex;animation:fade-in .2s ease}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+#shot-modal{background:linear-gradient(to bottom,var(--dark2),var(--dark));border-radius:var(--r-xl) var(--r-xl) 0 0;padding:20px 24px 44px;width:100%;border-top:1px solid rgba(255,255,255,0.12);max-height:88vh;overflow-y:auto;animation:sheet-up .35s cubic-bezier(.34,1.4,.64,1)}
+#shot-modal::-webkit-scrollbar{display:none}
+@keyframes sheet-up{from{transform:translateY(40px);opacity:.5}to{transform:translateY(0);opacity:1}}
+#modal-drag{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 20px}
+#modal-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+#modal-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;color:var(--text-primary);line-height:1.1}
+#modal-subtitle{font-size:12px;color:var(--text-secondary);margin-top:4px}
+#modal-close{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-section{margin-bottom:22px}
+.modal-section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;font-weight:600}
+.traj-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.traj-btn{background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.09);border-radius:var(--r-md);padding:14px 12px;cursor:pointer;transition:all .2s;text-align:left}
+.traj-btn:active{transform:scale(0.97)}
+.traj-btn.sel{border-color:var(--gold);background:rgba(201,168,75,0.1)}
+.traj-icon{font-size:26px;margin-bottom:6px}
+.traj-name{font-size:13px;font-weight:700;color:var(--text-primary)}
+.traj-desc{font-size:11px;color:var(--text-secondary);margin-top:3px;line-height:1.4}
+.traj-apex{font-size:10px;color:var(--gold);margin-top:4px;font-weight:600}
+.club-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.club-scroll::-webkit-scrollbar{display:none}
+.club-btn{flex-shrink:0;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.09);border-radius:var(--r-md);padding:10px 14px;cursor:pointer;transition:all .2s;text-align:center;min-width:58px}
+.club-btn.sel{border-color:var(--gold);background:rgba(201,168,75,0.1)}
+.club-btn:active{transform:scale(0.96)}
+.club-name{font-size:14px;font-weight:700;color:var(--text-primary)}
+.club-dist{font-size:10px;color:var(--text-muted);margin-top:2px}
+/* Shot preview arc */
+#shot-preview{height:80px;border-radius:var(--r-sm);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);overflow:hidden;margin-bottom:22px}
+#confirm-btn{width:100%;padding:17px;border-radius:var(--r-md);background:var(--gold);border:none;color:#1a0f00;font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+#confirm-btn:disabled{opacity:0.25;cursor:default}
+#confirm-btn:not(:disabled):active{transform:scale(0.98)}
+
+/* ─── SCORECARD ─── */
+#screen-scorecard{z-index:40}
+#sc-bg{position:absolute;inset:0;background:var(--dark)}
+#sc-header{padding:52px 24px 16px;background:linear-gradient(to bottom,rgba(0,0,0,0.8),transparent);position:relative;z-index:2;display:flex;align-items:center;gap:14px}
+#sc-back{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0}
+#sc-title-block{flex:1}
+#sc-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:900;color:var(--text-primary)}
+#sc-course-name{font-size:12px;color:var(--text-secondary);margin-top:2px}
+#sc-content{position:relative;z-index:2;overflow-y:auto;height:calc(844px - 130px);padding:0 20px 40px}
+#sc-content::-webkit-scrollbar{display:none}
+#sc-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px}
+.sc-sum-card{background:rgba(255,255,255,0.05);border:1px solid var(--card-border);border-radius:var(--r-md);padding:14px 12px;text-align:center}
+.sc-sum-val{font-family:'Playfair Display',serif;font-size:28px;font-weight:900;line-height:1}
+.sc-sum-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-top:4px}
+.sc-sum-card.gold .sc-sum-val{color:var(--gold-light)}
+.sc-sum-card.green .sc-sum-val{color:var(--green-light)}
+.sc-sum-card.red .sc-sum-val{color:#e84c3d}
+#sc-table-wrap{background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:var(--r-lg);overflow:hidden}
+.sc-table{width:100%;border-collapse:collapse}
+.sc-table th{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);padding:10px 10px;font-weight:600;text-align:center;border-bottom:1px solid var(--card-border)}
+.sc-table th:first-child{text-align:left}
+.sc-table td{padding:11px 10px;text-align:center;font-size:13px;color:var(--text-primary);border-bottom:1px solid rgba(255,255,255,0.04)}
+.sc-table td:first-child{text-align:left;font-weight:600;font-size:14px}
+.sc-table tr:last-child td{border-bottom:none}
+.sc-table tr.active-hole td{background:rgba(201,168,75,0.08)}
+.score-cell{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:700}
+.score-eagle{background:rgba(232,76,61,0.25);color:#ff8070;border:2px solid #e84c3d}
+.score-birdie{background:rgba(232,76,61,0.15);color:#ff9080;border:1.5px solid rgba(232,76,61,0.5)}
+.score-par{color:var(--text-primary)}
+.score-bogey{background:rgba(76,168,232,0.15);color:#80c0ff;border:1.5px solid rgba(76,168,232,0.4)}
+.score-double{background:rgba(76,168,232,0.25);color:#60aaff;border:2px solid #4ca8e8}
+.score-empty{color:var(--text-muted)}
+.sc-totals-row td{background:rgba(255,255,255,0.05);font-weight:700;font-size:14px;border-top:1px solid var(--card-border) !important;border-bottom:none}
+#sc-hole-detail{margin-top:20px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:18px;display:none}
+#sc-hole-detail.show{display:block}
+.sc-hole-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--gold-light);margin-bottom:12px}
+.sc-shot-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.sc-shot-row:last-child{border-bottom:none}
+.sc-shot-n{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--gold);width:24px}
+.sc-shot-info{flex:1}
+.sc-shot-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.sc-shot-meta{font-size:11px;color:var(--text-secondary);margin-top:1px}
+.sc-shot-yds{font-family:'Playfair Display',serif;font-size:18px;color:var(--text-primary);font-weight:700}
+.sc-shot-yds span{font-family:'Outfit',sans-serif;font-size:10px;color:var(--text-muted)}
+
+/* Stop tracking modal */
+#stop-modal{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px)}
+#stop-modal.show{display:flex;animation:fade-in .2s ease}
+#stop-modal-card{background:var(--dark2);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r-xl);padding:28px 24px;width:340px;text-align:center}
+#stop-modal-icon{font-size:44px;margin-bottom:12px}
+#stop-modal-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--text-primary);margin-bottom:8px}
+#stop-modal-sub{font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:22px}
+.stop-modal-actions{display:flex;flex-direction:column;gap:10px}
+.sma-btn{width:100%;padding:15px;border-radius:var(--r-md);border:none;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:all .2s}
+.sma-btn.danger{background:var(--red);color:#fff}
+.sma-btn.secondary{background:rgba(255,255,255,0.07);color:var(--text-primary);border:1px solid var(--card-border)}
+.sma-btn:active{transform:scale(0.98)}
+#stop-timer-adjust{margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border)}
+#stop-timer-label{font-size:12px;color:var(--text-secondary);margin-bottom:10px}
+.timer-options{display:flex;gap:8px;justify-content:center}
+.timer-opt{background:rgba(255,255,255,0.06);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:7px 16px;font-size:12px;font-weight:600;color:var(--text-secondary);cursor:pointer;transition:all .2s}
+.timer-opt.sel{background:rgba(201,168,75,0.15);border-color:var(--gold);color:var(--gold)}
+
+/* ─── PUTT MODAL ─── */
+#putt-modal{position:absolute;inset:0;z-index:65;display:none;align-items:flex-end;background:rgba(0,0,0,0.78);backdrop-filter:blur(8px)}
+#putt-modal.show{display:flex;animation:fade-in .25s ease}
+#putt-sheet{background:linear-gradient(to bottom,#0e1d0f,#080f09);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:20px 24px 44px;width:100%;border-top:1px solid rgba(255,255,255,0.12);animation:sheet-up .35s cubic-bezier(.34,1.4,.64,1)}
+#putt-drag{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 20px}
+#putt-header{margin-bottom:20px}
+#putt-flag{font-size:40px;margin-bottom:10px}
+#putt-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;color:var(--text-primary);line-height:1.1}
+#putt-subtitle{font-size:12px;color:var(--text-secondary);margin-top:5px;line-height:1.6}
+#putt-inference-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(90,184,94,0.12);border:1px solid rgba(90,184,94,0.3);border-radius:20px;padding:6px 14px;font-size:11px;color:var(--green-light);font-weight:600;margin-top:10px;margin-bottom:20px}
+#putt-inference-badge .badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green-light)}
+.putt-section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;font-weight:600}
+#putt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px}
+.putt-btn{background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.09);border-radius:var(--r-md);padding:16px 8px;cursor:pointer;transition:all .2s;text-align:center}
+.putt-btn:active{transform:scale(0.95)}
+.putt-btn.sel{border-color:var(--green-light);background:rgba(90,184,94,0.12)}
+.putt-btn.inference-match{border-color:rgba(90,184,94,0.5);background:rgba(90,184,94,0.07)}
+.putt-btn .p-num{font-family:'Playfair Display',serif;font-size:32px;font-weight:900;color:var(--gold-light);line-height:1}
+.putt-btn.sel .p-num{color:var(--green-light)}
+.putt-btn .p-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-top:4px;font-weight:600}
+.putt-btn .p-badge{font-size:9px;color:var(--green-light);margin-top:3px;font-weight:600;min-height:12px}
+#putt-gir-row{display:flex;align-items:center;gap:10px;padding:14px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:var(--r-md);margin-bottom:20px}
+#putt-gir-icon{font-size:22px}
+#putt-gir-info{flex:1}
+#putt-gir-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+#putt-gir-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
+.gir-toggle{display:flex;background:rgba(255,255,255,0.06);border:1px solid var(--card-border);border-radius:20px;overflow:hidden}
+.gir-opt{padding:7px 14px;font-size:11px;font-weight:700;color:var(--text-secondary);cursor:pointer;transition:all .2s;letter-spacing:.5px}
+.gir-opt.sel{background:var(--green-bright);color:#fff}
+#putt-confirm-btn{width:100%;padding:17px;border-radius:var(--r-md);background:var(--green-bright);border:none;color:#fff;font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+#putt-confirm-btn:disabled{opacity:0.25;cursor:default}
+#putt-confirm-btn:not(:disabled):active{transform:scale(0.98)}
+#putt-skip-link{text-align:center;margin-top:12px;font-size:11px;color:var(--text-muted);cursor:pointer;padding:4px}
+
+/* ─── PIN DROP CURSOR ─── */
+#pin-cursor{position:absolute;pointer-events:none;z-index:35;display:none;transform:translate(-50%,-100%)}
+#pin-cursor.show{display:block}
+.pin-cursor-icon{font-size:32px;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.6))}
+
+/* Dropped pins on canvas (rendered by JS) */
+
+/* ─── COURSE SELECT ENHANCEMENTS ─── */
+#cs-api-btn{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.06);border:1px solid var(--card-border);border-radius:20px;padding:8px 14px;cursor:pointer;transition:all .2s}
+#cs-api-btn.connected{border-color:rgba(90,184,94,0.4);background:rgba(90,184,94,0.08)}
+#cs-api-dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted)}
+#cs-api-btn.connected #cs-api-dot{background:var(--green-light);box-shadow:0 0 6px var(--green-light)}
+#cs-api-label{font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:.5px}
+#cs-api-btn.connected #cs-api-label{color:var(--green-light)}
+#cs-search-clear{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);cursor:pointer;padding:4px}
+#cs-search-results{position:absolute;left:0;right:0;top:calc(60px + 56px + 20px + 56px);bottom:0;overflow-y:auto;padding:0 20px 40px;z-index:5}
+#cs-search-results::-webkit-scrollbar{display:none}
+.cs-search-empty{text-align:center;padding:48px 24px;color:var(--text-muted);font-size:13px;line-height:1.7}
+.cs-search-empty .sce-icon{font-size:40px;margin-bottom:12px}
+.cs-spinner{display:flex;align-items:center;justify-content:center;padding:40px;gap:12px;color:var(--text-secondary);font-size:13px}
+.spinner-ring{width:20px;height:20px;border:2px solid rgba(255,255,255,0.1);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cs-api-result{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:14px}
+.cs-api-result:active{transform:scale(0.98);background:rgba(201,168,75,0.08);border-color:var(--gold)}
+.cs-api-result-badge{width:42px;height:42px;border-radius:var(--r-sm);background:var(--green-fair);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;font-family:'Playfair Display',serif;font-weight:900;color:var(--gold-light);font-size:14px}
+.cs-api-result-info{flex:1;min-width:0}
+.cs-api-result-name{font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-api-result-meta{font-size:11px;color:var(--text-secondary);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-api-result-par{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--gold);flex-shrink:0;text-align:center}
+.cs-api-result-par span{display:block;font-family:'Outfit',sans-serif;font-size:8px;color:var(--text-muted);letter-spacing:1px}
+.cs-live-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(90,184,94,0.12);border:1px solid rgba(90,184,94,0.25);border-radius:10px;padding:2px 8px;font-size:9px;font-weight:700;color:var(--green-light);letter-spacing:1px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
+.cs-demo-note{background:rgba(201,168,75,0.07);border:1px solid rgba(201,168,75,0.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:14px;font-size:11px;color:var(--text-secondary);line-height:1.6}
+.cs-demo-note strong{color:var(--gold-light)}
+
+/* Features card */
+#features-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:var(--r-lg);padding:18px;margin-top:20px;margin-bottom:8px}
+.features-card-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.features-card-icon{font-size:26px}
+.features-card-title{font-size:14px;font-weight:700;color:var(--text-primary)}
+.features-card-sub{font-size:11px;color:var(--text-muted);margin-top:2px}
+.feature-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.feature-row:last-child{border-bottom:none}
+.feature-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.feature-info{flex:1}
+.feature-name{font-size:13px;font-weight:600;color:var(--text-primary)}
+.feature-desc{font-size:11px;color:var(--text-secondary);margin-top:2px;line-height:1.5}
+.feature-status{font-size:9px;padding:3px 8px;border-radius:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;flex-shrink:0;margin-top:2px}
+.fs-planned{background:rgba(201,168,75,0.12);color:var(--gold);border:1px solid rgba(201,168,75,0.25)}
+.fs-soon{background:rgba(90,184,94,0.12);color:var(--green-light);border:1px solid rgba(90,184,94,0.25)}
+.fs-idea{background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1)}
+
+/* API features list */
+.api-feature-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.api-feature-row:last-child{border-bottom:none}
+.api-feature-check{color:var(--green-light);font-size:14px;flex-shrink:0}
+.api-feature-text{font-size:12px;color:var(--text-secondary)}
+#toast{position:absolute;top:110px;left:50%;transform:translateX(-50%) translateY(-20px);background:var(--dark2);border:1px solid var(--card-border);border-radius:var(--r-md);padding:10px 20px;font-size:13px;font-weight:500;color:var(--text-primary);pointer-events:none;opacity:0;transition:all .3s;white-space:nowrap;z-index:100;backdrop-filter:blur(12px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── PROFILE SETUP SCREEN ─── */
+#screen-profile{z-index:90;background:var(--dark)}
+#profile-bg{position:absolute;inset:0;background:radial-gradient(ellipse 100% 50% at 50% 100%,#1a3a1c 0%,var(--dark) 60%)}
+#profile-inner{position:relative;z-index:2;padding:56px 28px 40px;height:100%;overflow-y:auto;display:flex;flex-direction:column;gap:0}
+#profile-inner::-webkit-scrollbar{display:none}
+#profile-logo{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:var(--gold-light);letter-spacing:2px}
+#profile-sub{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--text-secondary);margin-top:4px;margin-bottom:24px}
+.profile-section{margin-bottom:22px}
+.profile-section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;font-weight:600}
+#avatar-preview-wrap{display:flex;justify-content:center;margin-bottom:20px}
+#avatar-preview-canvas{border-radius:var(--r-lg);background:rgba(255,255,255,0.03);border:1px solid var(--card-border)}
+#height-display{text-align:center;margin-bottom:10px}
+#height-val{font-family:'Playfair Display',serif;font-size:40px;font-weight:900;color:var(--gold-light);line-height:1}
+#height-unit-toggle{display:inline-flex;background:rgba(255,255,255,0.06);border:1px solid var(--card-border);border-radius:20px;overflow:hidden;margin-top:8px}
+.hu-opt{padding:5px 14px;font-size:11px;font-weight:700;color:var(--text-secondary);cursor:pointer;transition:all .2s}
+.hu-opt.sel{background:var(--gold);color:#1a0f00}
+#height-slider{width:100%;margin:10px 0;accent-color:var(--gold);height:4px}
+#height-range-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)}
+.hand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hand-btn{background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.09);border-radius:var(--r-md);padding:16px 12px;cursor:pointer;transition:all .2s;text-align:center}
+.hand-btn.sel{border-color:var(--gold);background:rgba(201,168,75,0.1)}
+.hand-btn:active{transform:scale(0.97)}
+.hand-btn .hb-icon{font-size:28px;margin-bottom:6px}
+.hand-btn .hb-label{font-size:13px;font-weight:700;color:var(--text-primary)}
+.hand-btn .hb-sub{font-size:10px;color:var(--text-secondary);margin-top:3px}
+.build-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.build-btn{background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.09);border-radius:var(--r-md);padding:12px 6px;cursor:pointer;transition:all .2s;text-align:center}
+.build-btn.sel{border-color:var(--gold);background:rgba(201,168,75,0.1)}
+.build-btn:active{transform:scale(0.97)}
+.build-btn .bb-icon{font-size:22px;margin-bottom:4px}
+.build-btn .bb-label{font-size:11px;font-weight:700;color:var(--text-primary)}
+#profile-cta{width:100%;padding:17px;border-radius:var(--r-md);background:var(--gold);border:none;color:#1a0f00;font-family:'Outfit',sans-serif;font-size:15px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .2s;margin-top:24px;flex-shrink:0}
+#profile-cta:active{transform:scale(0.98)}
+/* Swing overlay */
+#swing-overlay{position:absolute;inset:0;z-index:45;pointer-events:none;display:none}
+#swing-overlay.show{display:block}
+#swing-canvas{position:absolute;inset:0}
+#swing-replay{position:absolute;bottom:230px;left:50%;transform:translateX(-50%);width:348px;background:rgba(5,12,5,0.97);border:1px solid rgba(201,168,75,0.3);border-radius:var(--r-xl);overflow:hidden;pointer-events:all;display:none;animation:slide-up-fade .4s cubic-bezier(.34,1.56,.64,1)}
+#swing-replay.show{display:block}
+#swing-replay-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px}
+#swing-replay-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:900;color:var(--text-primary)}
+#swing-replay-meta{font-size:11px;color:var(--text-secondary);margin-top:2px}
+#swing-replay-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;pointer-events:all;flex-shrink:0}
+#swing-side-canvas{display:block;width:100%}
+#swing-replay-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.05)}
+.srs-cell{background:rgba(5,12,5,0.95);padding:10px 4px;text-align:center}
+.srs-val{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--gold-light)}
+.srs-lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-top:2px}
+#swing-phase-strip{display:flex;gap:0;border-top:1px solid rgba(255,255,255,0.06)}
+.phase-seg{flex:1;padding:8px 4px;text-align:center;cursor:pointer;transition:all .2s}
+.phase-seg.active{background:rgba(201,168,75,0.1)}
+.phase-seg-icon{font-size:14px}
+.phase-seg-label{font-size:8px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);margin-top:2px;font-weight:600}
+.phase-seg.active .phase-seg-label{color:var(--gold)}
+#avatar-hud{position:absolute;top:230px;right:16px;background:rgba(0,0,0,0.55);border:1px solid var(--card-border);border-radius:var(--r-md);padding:6px 10px;pointer-events:all;cursor:pointer;backdrop-filter:blur(12px);display:none;text-align:center}
+#avatar-hud.show{display:block}
+#avatar-hud-canvas{display:block;margin:0 auto}
+#avatar-hud-label{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-top:3px;font-weight:600}
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- ─── PROFILE SETUP SCREEN ─── -->
+<div id="screen-profile" class="screen">
+  <div id="profile-bg"></div>
+  <div id="profile-inner">
+    <div id="profile-logo">LINKS</div>
+    <div id="profile-sub">Set up your golfer</div>
+    <div id="avatar-preview-wrap">
+      <canvas id="avatar-preview-canvas" width="200" height="200"></canvas>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Your Height</div>
+      <div id="height-display">
+        <div id="height-val">5'10"</div>
+        <div id="height-unit-toggle">
+          <div class="hu-opt sel" onclick="setHeightUnit('imperial',this)">ft/in</div>
+          <div class="hu-opt" onclick="setHeightUnit('metric',this)">cm</div>
+        </div>
+      </div>
+      <input type="range" id="height-slider" min="152" max="213" value="178" oninput="onHeightChange(this.value)">
+      <div id="height-range-labels"><span>5'0"</span><span>5'6"</span><span>6'0"</span><span>6'6"</span><span>7'0"</span></div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Dominant Hand</div>
+      <div class="hand-grid">
+        <div class="hand-btn sel" data-hand="right" onclick="selectHand(this)">
+          <div class="hb-icon">🏌️</div>
+          <div class="hb-label">Right-Handed</div>
+          <div class="hb-sub">Most common</div>
+        </div>
+        <div class="hand-btn" data-hand="left" onclick="selectHand(this)">
+          <div class="hb-icon">🤸</div>
+          <div class="hb-label">Left-Handed</div>
+          <div class="hb-sub">Mirror swing</div>
+        </div>
+      </div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-label">Build</div>
+      <div class="build-grid">
+        <div class="build-btn" data-build="slim" onclick="selectBuild(this)">
+          <div class="bb-icon">🧍</div>
+          <div class="bb-label">Slim</div>
+        </div>
+        <div class="build-btn sel" data-build="average" onclick="selectBuild(this)">
+          <div class="bb-icon">🧑</div>
+          <div class="bb-label">Average</div>
+        </div>
+        <div class="build-btn" data-build="stocky" onclick="selectBuild(this)">
+          <div class="bb-icon">💪</div>
+          <div class="bb-label">Stocky</div>
+        </div>
+      </div>
+    </div>
+    <button id="profile-cta" onclick="saveProfile()">Build My Avatar →</button>
+  </div>
+</div>
+
+<!-- ─── COURSE SELECT SCREEN ─── -->
+<div id="screen-courses" class="screen hidden">
+  <div id="cs-bg"></div>
+  <div id="cs-header">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div id="cs-logo">LINKS</div>
+        <div id="cs-tagline">Golf Shot Tracer</div>
+      </div>
+      <div id="cs-api-btn" onclick="showApiPanel()" title="Connect live course data">
+        <div id="cs-api-dot"></div>
+        <span id="cs-api-label">Live Data</span>
+      </div>
+    </div>
+  </div>
+  <div id="cs-search">
+    <span id="cs-search-icon">🔍</span>
+    <input type="text" placeholder="Search any course worldwide…" id="cs-input" oninput="onSearchInput(this.value)" autocomplete="off">
+    <div id="cs-search-clear" onclick="clearSearch()" style="display:none">✕</div>
+  </div>
+  <!-- Search results (shown during live search) -->
+  <div id="cs-search-results" style="display:none">
+    <div id="cs-search-list"></div>
+  </div>
+  <!-- Default list (shown when not searching) -->
+  <div id="cs-list">
+    <div class="cs-section-label">⭐ Recently Played</div>
+    <div id="recent-courses"></div>
+    <div class="cs-section-label" id="nearby-label">📍 Featured Courses</div>
+    <div id="all-courses"></div>
+    <!-- Feature suggestions card -->
+    <div id="features-card">
+      <div class="features-card-header">
+        <div class="features-card-icon">🚀</div>
+        <div>
+          <div class="features-card-title">Upcoming Features</div>
+          <div class="features-card-sub">Roadmap for LINKS v2</div>
+        </div>
+      </div>
+      <div id="features-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── API KEY PANEL ─── -->
+<div id="api-panel" class="screen hidden slide-up" style="z-index:80;background:var(--dark)">
+  <div style="padding:52px 24px 0;display:flex;align-items:center;gap:14px;margin-bottom:24px">
+    <div id="api-back-btn" onclick="hideApiPanel()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;flex-shrink:0">←</div>
+    <div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--text-primary)">Live Course Data</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Connect to search 40,000+ real courses</div>
+    </div>
+  </div>
+  <div style="padding:0 24px;overflow-y:auto;height:calc(844px - 130px)">
+    <div style="background:rgba(255,255,255,0.04);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:20px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:8px">🌐 Golf Course API</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:14px">Get a free API key at <span style="color:var(--gold);cursor:pointer" onclick="openLink('https://golfcourseapi.com')">golfcourseapi.com</span> to search real course data including hole-by-hole yardage, par, and ratings for over 40,000 courses worldwide.</div>
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;font-weight:600">Your API Key</div>
+      <input type="text" id="api-key-input" placeholder="Enter your API key…" style="width:100%;background:rgba(255,255,255,0.07);border:1px solid var(--card-border);border-radius:var(--r-sm);padding:12px 16px;color:var(--text-primary);font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px">
+      <button onclick="saveApiKey()" style="width:100%;padding:13px;border-radius:var(--r-sm);background:var(--gold);border:none;color:#1a0f00;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:1px">CONNECT & TEST</button>
+      <div id="api-status-msg" style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:10px;min-height:16px"></div>
+    </div>
+    <div style="background:rgba(255,255,255,0.04);border:1px solid var(--card-border);border-radius:var(--r-lg);padding:20px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px">🗂 What live data provides</div>
+      <div id="api-features-list"></div>
+    </div>
+    <div style="background:rgba(201,168,75,0.08);border:1px solid rgba(201,168,75,0.25);border-radius:var(--r-lg);padding:16px;margin-bottom:20px">
+      <div style="font-size:12px;font-weight:700;color:var(--gold-light);margin-bottom:6px">📱 On a real iPhone</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.7">In a native app, GPS would auto-detect your location and surface nearby courses without any manual search. The LINKS app would request location permission on first launch and pre-load the 5 closest courses automatically.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MAIN TRACKER SCREEN ─── -->
+<div id="screen-main" class="screen hidden">
+  <canvas id="map-canvas" width="390" height="844"></canvas>
+  <div id="map-ui">
+    <div id="top-hud">
+      <div id="hud-row1">
+        <div id="back-btn" onclick="showCourseSelect()">←</div>
+        <div id="course-pill">
+          <span id="course-pill-name">Augusta National</span>
+          <span id="course-pill-hole">Hole 1</span>
+        </div>
+        <div id="back-btn" onclick="showScorecard()" style="font-size:16px">📋</div>
+      </div>
+      <div id="hud-stats">
+        <div class="hud-stat"><div class="hud-stat-val" id="stat-par">4</div><div class="hud-stat-lbl">Par</div></div>
+        <div class="hud-stat"><div class="hud-stat-val" id="stat-yds">385</div><div class="hud-stat-lbl">Yards</div></div>
+        <div class="hud-stat"><div class="hud-stat-val" id="stat-shots">0</div><div class="hud-stat-lbl">Shots</div></div>
+        <div class="hud-stat"><div class="hud-stat-val" id="stat-score" style="color:var(--green-light)">E</div><div class="hud-stat-lbl">Score</div></div>
+      </div>
+    </div>
+    <div style="position:absolute;top:190px;left:20px;right:20px;display:flex;gap:6px;pointer-events:all;overflow-x:auto" id="hole-nav"></div>
+    <div id="pin-mode-banner" onclick="cancelPinMode()">📍 Tap map to place pin — tap here to cancel</div>
+    <div id="gps-status" style="bottom:310px">
+      <div id="gps-dot" class="searching"></div>
+      <span id="gps-text">Acquiring GPS…</span>
+    </div>
+    <div id="countdown-card">
+      <div id="cd-row">
+        <svg id="cd-svg" viewBox="0 0 52 52">
+          <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3.5"/>
+          <circle id="cd-arc" cx="26" cy="26" r="22" fill="none" stroke="#c8a84b" stroke-width="3.5" stroke-dasharray="138.2" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 26 26)" style="transition:stroke-dashoffset .15s linear"/>
+          <text x="26" y="31" text-anchor="middle" fill="#e8ca6e" font-family="Playfair Display" font-size="14" font-weight="700" id="cd-num">30</text>
+        </svg>
+        <div id="cd-info">
+          <div id="cd-headline">You've stopped moving</div>
+          <div id="cd-sub">Shot detection in <span id="cd-secs">30</span>s — or log now</div>
+        </div>
+        <div id="cd-skip" onclick="skipCountdown()">Log Now</div>
+      </div>
+      <div id="cd-dismiss" onclick="dismissCountdown()">Not a shot — keep tracking</div>
+    </div>
+    <div id="shot-drawer">
+      <div id="drawer-inner">
+        <div id="drawer-handle"></div>
+        <div id="drawer-top">
+          <div id="drawer-title">Shot History</div>
+          <div id="drawer-actions">
+            <div class="drawer-action-btn" onclick="enterPinMode()">📍 Pin</div>
+            <div class="drawer-action-btn primary" id="next-hole-btn" onclick="nextHole()" style="display:none">Next Hole →</div>
+          </div>
+        </div>
+        <div id="shots-list"><div style="color:var(--text-muted);font-size:13px;padding:8px 0 16px">No shots yet — press Track to begin</div></div>
+        <div id="bottom-controls">
+          <div id="scorecard-btn" onclick="showScorecard()">📊</div>
+          <div id="track-btn" onclick="toggleTracking()">
+            <div class="tb-icon">⛳</div>
+            <div class="tb-label">Track</div>
+          </div>
+          <div id="pin-btn" onclick="enterPinMode()">📍</div>
+        </div>
+      </div>
+    </div>
+    <div id="pin-cursor" class=""><div class="pin-cursor-icon">📍</div></div>
+    <!-- Avatar HUD mini -->
+    <div id="avatar-hud" onclick="replayLastSwing()">
+      <canvas id="avatar-hud-canvas" width="44" height="44"></canvas>
+      <div id="avatar-hud-label">Tap replay</div>
+    </div>
+    <!-- Swing overlay (full map overlay during animation) -->
+    <div id="swing-overlay">
+      <canvas id="swing-canvas" width="390" height="844"></canvas>
+    </div>
+    <!-- Swing replay panel -->
+    <div id="swing-replay">
+      <div id="swing-replay-header">
+        <div>
+          <div id="swing-replay-title">Swing Analysis</div>
+          <div id="swing-replay-meta">Shot 1 · Driver</div>
+        </div>
+        <button id="swing-replay-close" onclick="closeSwingReplay()">✕</button>
+      </div>
+      <canvas id="swing-side-canvas" width="348" height="180"></canvas>
+      <div id="swing-replay-stats">
+        <div class="srs-cell"><div class="srs-val" id="srs-tempo">3:1</div><div class="srs-lbl">Tempo</div></div>
+        <div class="srs-cell"><div class="srs-val" id="srs-arc">Wide</div><div class="srs-lbl">Arc</div></div>
+        <div class="srs-cell"><div class="srs-val" id="srs-plane">On</div><div class="srs-lbl">Plane</div></div>
+        <div class="srs-cell"><div class="srs-val" id="srs-release">Late</div><div class="srs-lbl">Release</div></div>
+      </div>
+      <div id="swing-phase-strip">
+        <div class="phase-seg active" data-phase="address" onclick="setSwingPhase(this)"><div class="phase-seg-icon">🧍</div><div class="phase-seg-label">Address</div></div>
+        <div class="phase-seg" data-phase="takeaway" onclick="setSwingPhase(this)"><div class="phase-seg-icon">↗️</div><div class="phase-seg-label">Takeaway</div></div>
+        <div class="phase-seg" data-phase="top" onclick="setSwingPhase(this)"><div class="phase-seg-icon">🔝</div><div class="phase-seg-label">Top</div></div>
+        <div class="phase-seg" data-phase="impact" onclick="setSwingPhase(this)"><div class="phase-seg-icon">💥</div><div class="phase-seg-label">Impact</div></div>
+        <div class="phase-seg" data-phase="follow" onclick="setSwingPhase(this)"><div class="phase-seg-icon">🔄</div><div class="phase-seg-label">Follow</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SCORECARD SCREEN ─── -->
+<div id="screen-scorecard" class="screen hidden slide-up">
+  <div id="sc-bg"></div>
+  <div id="sc-header">
+    <div id="sc-back" onclick="hideScorecard()">←</div>
+    <div id="sc-title-block">
+      <div id="sc-title">Scorecard</div>
+      <div id="sc-course-name">Augusta National · Round 1</div>
+    </div>
+  </div>
+  <div id="sc-content">
+    <div id="sc-summary">
+      <div class="sc-sum-card gold"><div class="sc-sum-val" id="sc-total-score">E</div><div class="sc-sum-lbl">Total Score</div></div>
+      <div class="sc-sum-card"><div class="sc-sum-val" id="sc-total-shots" style="color:var(--text-primary)">0</div><div class="sc-sum-lbl">Total Shots</div></div>
+      <div class="sc-sum-card green"><div class="sc-sum-val" id="sc-holes-played">0</div><div class="sc-sum-lbl">Holes Played</div></div>
+    </div>
+    <div id="sc-summary2" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px">
+      <div class="sc-sum-card"><div class="sc-sum-val" id="sc-total-putts" style="color:var(--blue)">0</div><div class="sc-sum-lbl">Total Putts</div></div>
+      <div class="sc-sum-card"><div class="sc-sum-val" id="sc-avg-putts" style="color:var(--text-secondary)">—</div><div class="sc-sum-lbl">Avg Putts</div></div>
+      <div class="sc-sum-card"><div class="sc-sum-val" id="sc-gir-count" style="color:var(--green-light)">0</div><div class="sc-sum-lbl">GIR</div></div>
+    </div>
+    <div id="sc-table-wrap"><table class="sc-table" id="sc-table"><thead><tr><th>Hole</th><th>Par</th><th>Yds</th><th>⛳</th><th>Putts</th><th>+/-</th></tr></thead><tbody id="sc-tbody"></tbody></table></div>
+    <div id="sc-hole-detail">
+      <div class="sc-hole-title" id="sc-detail-title">Hole 1 — Par 4</div>
+      <div id="sc-detail-shots"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SHOT MODAL ─── -->
+<div id="modal-backdrop">
+  <div id="shot-modal">
+    <div id="modal-drag"></div>
+    <div id="modal-header">
+      <div>
+        <div id="modal-title">Log Your Shot</div>
+        <div id="modal-subtitle">You stopped — select shot type & club</div>
+      </div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Shot Trajectory</div>
+      <div class="traj-grid">
+        <div class="traj-btn" data-type="high" onclick="selectTraj(this)">
+          <div class="traj-icon">🏔️</div>
+          <div class="traj-name">High</div>
+          <div class="traj-desc">Lofted, steep descent, soft landing</div>
+          <div class="traj-apex">Apex ~80-100ft</div>
+        </div>
+        <div class="traj-btn" data-type="line" onclick="selectTraj(this)">
+          <div class="traj-icon">➡️</div>
+          <div class="traj-name">Line Drive</div>
+          <div class="traj-desc">Penetrating flight, medium height</div>
+          <div class="traj-apex">Apex ~40-60ft</div>
+        </div>
+        <div class="traj-btn" data-type="low" onclick="selectTraj(this)">
+          <div class="traj-icon">↘️</div>
+          <div class="traj-name">Low Punch</div>
+          <div class="traj-desc">Knockdown, into wind, extra roll</div>
+          <div class="traj-apex">Apex ~15-25ft</div>
+        </div>
+        <div class="traj-btn" data-type="ground" onclick="selectTraj(this)">
+          <div class="traj-icon">🏃</div>
+          <div class="traj-name">Bump & Run</div>
+          <div class="traj-desc">Chip / ground ball, heavy roll</div>
+          <div class="traj-apex">Stays low</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Shot Preview</div>
+      <canvas id="shot-preview" width="342" height="80"></canvas>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-label">Club</div>
+      <div class="club-scroll">
+        <div class="club-btn" data-club="D" data-dist="250" onclick="selectClub(this)"><div class="club-name">D</div><div class="club-dist">250y</div></div>
+        <div class="club-btn" data-club="3W" data-dist="225" onclick="selectClub(this)"><div class="club-name">3W</div><div class="club-dist">225y</div></div>
+        <div class="club-btn" data-club="5W" data-dist="200" onclick="selectClub(this)"><div class="club-name">5W</div><div class="club-dist">200y</div></div>
+        <div class="club-btn" data-club="3H" data-dist="190" onclick="selectClub(this)"><div class="club-name">3H</div><div class="club-dist">190y</div></div>
+        <div class="club-btn" data-club="4i" data-dist="180" onclick="selectClub(this)"><div class="club-name">4i</div><div class="club-dist">180y</div></div>
+        <div class="club-btn" data-club="5i" data-dist="170" onclick="selectClub(this)"><div class="club-name">5i</div><div class="club-dist">170y</div></div>
+        <div class="club-btn" data-club="6i" data-dist="160" onclick="selectClub(this)"><div class="club-name">6i</div><div class="club-dist">160y</div></div>
+        <div class="club-btn" data-club="7i" data-dist="150" onclick="selectClub(this)"><div class="club-name">7i</div><div class="club-dist">150y</div></div>
+        <div class="club-btn" data-club="8i" data-dist="138" onclick="selectClub(this)"><div class="club-name">8i</div><div class="club-dist">138y</div></div>
+        <div class="club-btn" data-club="9i" data-dist="125" onclick="selectClub(this)"><div class="club-name">9i</div><div class="club-dist">125y</div></div>
+        <div class="club-btn" data-club="PW" data-dist="110" onclick="selectClub(this)"><div class="club-name">PW</div><div class="club-dist">110y</div></div>
+        <div class="club-btn" data-club="GW" data-dist="95" onclick="selectClub(this)"><div class="club-name">GW</div><div class="club-dist">95y</div></div>
+        <div class="club-btn" data-club="SW" data-dist="80" onclick="selectClub(this)"><div class="club-name">SW</div><div class="club-dist">80y</div></div>
+        <div class="club-btn" data-club="LW" data-dist="60" onclick="selectClub(this)"><div class="club-name">LW</div><div class="club-dist">60y</div></div>
+        <div class="club-btn" data-club="PT" data-dist="0" onclick="selectClub(this)"><div class="club-name">⛳</div><div class="club-dist">Putt</div></div>
+      </div>
+    </div>
+    <button id="confirm-btn" disabled onclick="confirmShot()">LOG SHOT</button>
+  </div>
+</div>
+
+<!-- ─── PUTT MODAL ─── -->
+<div id="putt-modal">
+  <div id="putt-sheet">
+    <div id="putt-drag"></div>
+    <div id="putt-header">
+      <div id="putt-flag">⛳</div>
+      <div id="putt-title">How many putts?</div>
+      <div id="putt-subtitle">You're on the green — log your putts to complete the hole.</div>
+      <div id="putt-inference-badge"><span class="badge-dot"></span><span id="putt-inference-text">Based on your approach, 2 putts estimated</span></div>
+    </div>
+    <div class="putt-section-label">Number of Putts</div>
+    <div id="putt-grid">
+      <div class="putt-btn" data-putts="1" onclick="selectPutts(this)">
+        <div class="p-num">1</div>
+        <div class="p-label">Putt</div>
+        <div class="p-badge" id="p-badge-1"></div>
+      </div>
+      <div class="putt-btn" data-putts="2" onclick="selectPutts(this)">
+        <div class="p-num">2</div>
+        <div class="p-label">Putts</div>
+        <div class="p-badge" id="p-badge-2">avg</div>
+      </div>
+      <div class="putt-btn" data-putts="3" onclick="selectPutts(this)">
+        <div class="p-num">3</div>
+        <div class="p-label">Putts</div>
+        <div class="p-badge" id="p-badge-3"></div>
+      </div>
+      <div class="putt-btn" data-putts="4" onclick="selectPutts(this)">
+        <div class="p-num">4</div>
+        <div class="p-label">Putts</div>
+        <div class="p-badge" id="p-badge-4"></div>
+      </div>
+    </div>
+    <div id="putt-gir-row">
+      <div id="putt-gir-icon">🟢</div>
+      <div id="putt-gir-info">
+        <div id="putt-gir-title">Green in Regulation?</div>
+        <div id="putt-gir-sub">Did you reach the green within the regulation number of shots?</div>
+      </div>
+      <div class="gir-toggle">
+        <div class="gir-opt sel" id="gir-yes" onclick="selectGIR('yes')">Yes</div>
+        <div class="gir-opt" id="gir-no" onclick="selectGIR('no')">No</div>
+      </div>
+    </div>
+    <button id="putt-confirm-btn" disabled onclick="confirmPutts()">FINISH HOLE</button>
+    <div id="putt-skip-link" onclick="skipPutts()">Skip putt logging for this hole</div>
+  </div>
+</div>
+
+<!-- ─── STOP TRACKING MODAL ─── -->
+<div id="stop-modal">
+  <div id="stop-modal-card">
+    <div id="stop-modal-icon">🏁</div>
+    <div id="stop-modal-title">Stop Tracking?</div>
+    <div id="stop-modal-sub">Your round has been recorded. You can also adjust the auto-detect timer so it suits your pace of play.</div>
+    <div class="stop-modal-actions">
+      <button class="sma-btn danger" onclick="confirmStop()">Stop & Save Round</button>
+      <button class="sma-btn secondary" onclick="closeStopModal()">Keep Tracking</button>
+    </div>
+    <div id="stop-timer-adjust">
+      <div id="stop-timer-label">⏱ Auto-detect timer (currently <span id="cur-timer-label">30s</span>)</div>
+      <div class="timer-options">
+        <div class="timer-opt" data-secs="10" onclick="setTimer(this)">10s</div>
+        <div class="timer-opt sel" data-secs="30" onclick="setTimer(this)">30s</div>
+        <div class="timer-opt" data-secs="60" onclick="setTimer(this)">60s</div>
+        <div class="timer-opt" data-secs="120" onclick="setTimer(this)">2min</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── COURSE DATA ───
+const COURSES = [
+  {id:'augusta',name:'Augusta National GC',location:'Augusta, GA',holes:18,par:72,yardage:7475,logo:'🌿',
+   holes_data:[
+    {n:1,par:4,yds:445,name:'Tea Olive'},{n:2,par:5,yds:575,name:'Pink Dogwood'},
+    {n:3,par:4,yds:350,name:'Flowering Peach'},{n:4,par:3,yds:240,name:'Flowering Crab Apple'},
+    {n:5,par:4,yds:495,name:'Magnolia'},{n:6,par:3,yds:180,name:'Juniper'},
+    {n:7,par:4,yds:450,name:'Pampas'},{n:8,par:5,yds:570,name:'Yellow Jasmine'},
+    {n:9,par:4,yds:460,name:'Carolina Cherry'},{n:10,par:4,yds:495,name:'Camellia'},
+    {n:11,par:4,yds:520,name:"White Dogwood"},{n:12,par:3,yds:155,name:'Golden Bell'},
+    {n:13,par:5,yds:510,name:'Azalea'},{n:14,par:4,yds:440,name:'Chinese Fir'},
+    {n:15,par:5,yds:550,name:'Firethorn'},{n:16,par:3,yds:170,name:'Redbud'},
+    {n:17,par:4,yds:440,name:'Nandina'},{n:18,par:4,yds:465,name:'Holly'}
+   ]},
+  {id:'pebble',name:'Pebble Beach GL',location:'Pebble Beach, CA',holes:18,par:72,yardage:7040,logo:'🌊',
+   holes_data:[
+    {n:1,par:4,yds:381,name:'Hole 1'},{n:2,par:5,yds:502,name:'Hole 2'},
+    {n:3,par:4,yds:390,name:'Hole 3'},{n:4,par:4,yds:331,name:'Hole 4'},
+    {n:5,par:3,yds:195,name:'Hole 5'},{n:6,par:5,yds:523,name:'Hole 6'},
+    {n:7,par:3,yds:107,name:'Hole 7'},{n:8,par:4,yds:431,name:'Hole 8'},
+    {n:9,par:4,yds:481,name:'Hole 9'},{n:10,par:4,yds:446,name:'Hole 10'},
+    {n:11,par:4,yds:380,name:'Hole 11'},{n:12,par:3,yds:202,name:'Hole 12'},
+    {n:13,par:4,yds:399,name:'Hole 13'},{n:14,par:5,yds:580,name:'Hole 14'},
+    {n:15,par:4,yds:397,name:'Hole 15'},{n:16,par:4,yds:403,name:'Hole 16'},
+    {n:17,par:3,yds:178,name:'Hole 17'},{n:18,par:5,yds:543,name:'Hole 18'}
+   ]},
+  {id:'stjAndrews',name:"St Andrews (Old Course)",location:'St Andrews, Scotland',holes:18,par:72,yardage:6721,logo:'🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+   holes_data:[
+    {n:1,par:4,yds:376,name:'Burn'},{n:2,par:4,yds:453,name:'Dyke'},
+    {n:3,par:4,yds:371,name:'Cartgate (Out)'},{n:4,par:4,yds:480,name:'Ginger Beer'},
+    {n:5,par:5,yds:568,name:'Hole O\'Cross (Out)'},{n:6,par:4,yds:412,name:'Heathery (Out)'},
+    {n:7,par:4,yds:371,name:'High (Out)'},{n:8,par:3,yds:175,name:'Short'},
+    {n:9,par:4,yds:352,name:'End'},{n:10,par:4,yds:386,name:'Bobby Jones'},
+    {n:11,par:3,yds:174,name:'High (In)'},{n:12,par:4,yds:351,name:'Heathery (In)'},
+    {n:13,par:4,yds:465,name:'Hole O\'Cross (In)'},{n:14,par:5,yds:614,name:'Long'},
+    {n:15,par:4,yds:401,name:'Cartgate (In)'},{n:16,par:4,yds:423,name:'Corner of the Dyke'},
+    {n:17,par:4,yds:495,name:'Road'},{n:18,par:4,yds:356,name:'Tom Morris'}
+   ]},
+  {id:'tpc',name:'TPC Sawgrass',location:'Ponte Vedra Beach, FL',holes:18,par:72,yardage:7215,logo:'🐊',
+   holes_data:[
+    {n:1,par:4,yds:423,name:'Hole 1'},{n:2,par:5,yds:532,name:'Hole 2'},
+    {n:3,par:3,yds:177,name:'Hole 3'},{n:4,par:4,yds:384,name:'Hole 4'},
+    {n:5,par:4,yds:466,name:'Hole 5'},{n:6,par:4,yds:393,name:'Hole 6'},
+    {n:7,par:5,yds:442,name:'Hole 7'},{n:8,par:3,yds:219,name:'Hole 8'},
+    {n:9,par:5,yds:583,name:'Hole 9'},{n:10,par:4,yds:424,name:'Hole 10'},
+    {n:11,par:5,yds:558,name:'Hole 11'},{n:12,par:4,yds:358,name:'Hole 12'},
+    {n:13,par:3,yds:181,name:'Hole 13'},{n:14,par:4,yds:467,name:'Hole 14'},
+    {n:15,par:4,yds:449,name:'Hole 15'},{n:16,par:5,yds:523,name:'Hole 16'},
+    {n:17,par:3,yds:137,name:'Island Green'},{n:18,par:4,yds:462,name:'Hole 18'}
+   ]},
+  {id:'torrey',name:'Torrey Pines (South)',location:'La Jolla, CA',holes:18,par:72,yardage:7698,logo:'🌲',
+   holes_data:[
+    {n:1,par:4,yds:448,name:'Hole 1'},{n:2,par:4,yds:389,name:'Hole 2'},
+    {n:3,par:3,yds:199,name:'Hole 3'},{n:4,par:5,yds:526,name:'Hole 4'},
+    {n:5,par:4,yds:452,name:'Hole 5'},{n:6,par:4,yds:462,name:'Hole 6'},
+    {n:7,par:4,yds:460,name:'Hole 7'},{n:8,par:3,yds:170,name:'Hole 8'},
+    {n:9,par:5,yds:613,name:'Hole 9'},{n:10,par:4,yds:408,name:'Hole 10'},
+    {n:11,par:3,yds:222,name:'Hole 11'},{n:12,par:4,yds:504,name:'Hole 12'},
+    {n:13,par:4,yds:614,name:'Hole 13'},{n:14,par:5,yds:614,name:'Hole 14'},
+    {n:15,par:4,yds:471,name:'Hole 15'},{n:16,par:4,yds:454,name:'Hole 16'},
+    {n:17,par:3,yds:223,name:'Hole 17'},{n:18,par:5,yds:570,name:'Hole 18'}
+   ]}
+];
+
+// ─── STATE ───
+let activeCourse = null;
+let currentHoleIdx = 0;
+let tracking = false;
+let shots = []; // all shots this round, keyed by hole
+let holeShotsMap = {}; // holeIdx -> [{...}]
+let scoreMap = {}; // holeIdx -> strokes
+let puttMap = {}; // holeIdx -> putts
+let girMap = {}; // holeIdx -> bool (green in regulation)
+let inferredPutts = 2; // current inference
+let selectedPutts = null;
+let selectedGIR = 'yes';
+let playerPos = {x:195,y:660};
+let teePos = {x:195,y:665};
+let playerTrail = [];
+let moving = false;
+let cdInterval = null;
+let cdDuration = 30;
+let cdSecs = 30;
+let pinMode = false;
+let droppedPins = []; // [{x,y,holeIdx,label}]
+let tracerList = []; // rendered tracers
+let moveSimInterval = null;
+let selectedTrajType = null;
+let selectedClubData = null;
+let animRaf = null;
+let gpsReady = false;
+const RECENT = ['augusta','pebble'];
+
+// ─── FEATURES ROADMAP DATA ───
+const FEATURES_ROADMAP = [
+  {icon:'🛰️', name:'Real GPS Positioning', desc:'True lat/lng tracking that maps your actual movement onto the course satellite view.', status:'soon'},
+  {icon:'💨', name:'Wind & Weather Overlay', desc:'Live wind direction, speed, and temperature affecting trajectory predictions in real time.', status:'planned'},
+  {icon:'🎯', name:'Shot Dispersion Cone', desc:'Visualize the probability zone where your ball likely ended up based on club + shot type variance.', status:'planned'},
+  {icon:'🔄', name:'Shot Shape (Fade/Draw)', desc:'Select fade, draw, or straight shape that curves the tracer arc on the canvas.', status:'soon'},
+  {icon:'📈', name:'Strokes Gained Analysis', desc:'Compare your performance vs tour average per shot category — approach, putting, off the tee.', status:'planned'},
+  {icon:'🏌️', name:'Companion Mode', desc:'Track multiple players in the same round. Each gets their own color-coded tracer.', status:'planned'},
+  {icon:'🎙️', name:'Voice Shot Logging', desc:'Tap-to-speak your shot type and club instead of tapping through the modal.', status:'idea'},
+  {icon:'📐', name:'Handicap & Net Score', desc:'Enter your handicap index and get net score alongside gross on every hole.', status:'planned'},
+  {icon:'⚠️', name:'Hazard Awareness', desc:'Bunkers and water between your position and the target flagged in the shot path.', status:'soon'},
+  {icon:'📊', name:'Round History & Trends', desc:'Compare this hole vs your last 5 rounds with club distance calibration over time.', status:'idea'},
+];
+
+// ─── API PANEL ───
+let userApiKey = localStorage.getItem('links_api_key') || '';
+function showApiPanel() {
+  document.getElementById('api-panel').classList.remove('hidden','slide-up');
+  document.getElementById('api-key-input').value = userApiKey;
+  renderApiFeaturesList();
+  if(userApiKey) document.getElementById('api-status-msg').textContent = '✅ API key connected';
+}
+function hideApiPanel() {
+  document.getElementById('api-panel').classList.add('hidden','slide-up');
+}
+function renderApiFeaturesList() {
+  const items = [
+    'Search 40,000+ courses by name or location',
+    'Real hole-by-hole par and yardage data',
+    'Course rating and slope for handicap calc',
+    'GPS coordinates for each tee and green',
+    'Satellite imagery integration ready',
+    'Auto-detect nearby courses via GPS',
+  ];
+  document.getElementById('api-features-list').innerHTML = items.map(t=>`
+    <div class="api-feature-row">
+      <div class="api-feature-check">✓</div>
+      <div class="api-feature-text">${t}</div>
+    </div>`).join('');
+}
+async function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const msg = document.getElementById('api-status-msg');
+  if(!key){msg.style.color='#e84c3d'; msg.textContent='Please enter an API key'; return;}
+  msg.style.color='var(--text-secondary)'; msg.textContent='Testing connection…';
+  try {
+    const res = await fetch(`https://api.golfcourseapi.com/v1/search?search_query=Augusta&key=${key}`);
+    if(res.ok) {
+      userApiKey = key;
+      localStorage.setItem('links_api_key',key);
+      msg.style.color='var(--green-light)'; msg.textContent='✅ Connected! Live search enabled.';
+      updateApiButtonState();
+      setTimeout(hideApiPanel,1200);
+    } else {
+      msg.style.color='#e84c3d'; msg.textContent=`❌ Invalid key (${res.status}). Check and retry.`;
+    }
+  } catch(e) {
+    // Network sandbox — explain what would happen
+    userApiKey = key;
+    localStorage.setItem('links_api_key',key);
+    msg.style.color='var(--gold)'; msg.textContent='⚠️ Saved — network blocked in demo. Works in production.';
+    updateApiButtonState();
+  }
+}
+function updateApiButtonState() {
+  const btn = document.getElementById('cs-api-btn');
+  if(userApiKey) { btn.classList.add('connected'); document.getElementById('cs-api-label').textContent='Connected'; }
+  else { btn.classList.remove('connected'); document.getElementById('cs-api-label').textContent='Live Data'; }
+}
+
+// ─── FEATURES CARD ───
+function renderFeaturesCard() {
+  document.getElementById('features-list').innerHTML = FEATURES_ROADMAP.map(f=>`
+    <div class="feature-row">
+      <div class="feature-icon">${f.icon}</div>
+      <div class="feature-info">
+        <div class="feature-name">${f.name}</div>
+        <div class="feature-desc">${f.desc}</div>
+      </div>
+      <div class="feature-status fs-${f.status}">${f.status==='soon'?'Coming Soon':f.status==='planned'?'Planned':'Idea'}</div>
+    </div>`).join('');
+}
+
+// ─── COURSE SEARCH ───
+let searchDebounce = null;
+let isSearching = false;
+
+function onSearchInput(val) {
+  const clear = document.getElementById('cs-search-clear');
+  clear.style.display = val ? 'block' : 'none';
+  clearTimeout(searchDebounce);
+  if(!val || val.length < 2) {
+    showDefaultList();
+    return;
+  }
+  searchDebounce = setTimeout(()=>searchCourses(val), 420);
+}
+
+function clearSearch() {
+  document.getElementById('cs-input').value = '';
+  document.getElementById('cs-search-clear').style.display='none';
+  showDefaultList();
+}
+
+function showDefaultList() {
+  document.getElementById('cs-search-results').style.display='none';
+  document.getElementById('cs-list').style.display='block';
+}
+
+async function searchCourses(query) {
+  document.getElementById('cs-list').style.display='none';
+  const results = document.getElementById('cs-search-results');
+  const list = document.getElementById('cs-search-list');
+  results.style.display='block';
+  list.innerHTML=`<div class="cs-spinner"><div class="spinner-ring"></div>Searching courses…</div>`;
+
+  // Try live API first if key is set
+  if(userApiKey) {
+    try {
+      const res = await fetch(`https://api.golfcourseapi.com/v1/search?search_query=${encodeURIComponent(query)}&key=${userApiKey}`);
+      if(res.ok){
+        const data = await res.json();
+        const courses = data.courses || data.data || [];
+        if(courses.length > 0){
+          renderApiResults(courses, list, true);
+          return;
+        }
+      }
+    } catch(e){}
+  }
+
+  // Fallback: filter local courses + show demo note + dummy results
+  const local = COURSES.filter(c=>
+    c.name.toLowerCase().includes(query.toLowerCase()) ||
+    c.location.toLowerCase().includes(query.toLowerCase())
+  );
+
+  if(local.length > 0) {
+    renderLocalResults(local, list, query);
+  } else {
+    renderDemoResults(query, list);
+  }
+}
+
+function renderApiResults(courses, list, isLive) {
+  list.innerHTML = `<div class="cs-section-label">🔴 Live Results <span class="cs-live-badge">● LIVE</span></div>` +
+    courses.slice(0,20).map(c=>{
+      const holes = c.tees?.male?.tees?.[0]?.hole_details?.length || c.num_holes || 18;
+      const par = c.tees?.male?.tees?.[0]?.par_total || c.par || 72;
+      const loc = [c.city, c.state, c.country].filter(Boolean).join(', ');
+      return `<div class="cs-api-result" onclick='selectApiCourse(${JSON.stringify({
+        id: 'api_'+c.id,
+        name: c.club_name || c.course_name || c.name,
+        location: loc,
+        holes, par,
+        yardage: c.tees?.male?.tees?.[0]?.total_yards || 0,
+        logo:'🌐',
+        holes_data: buildHolesFromApi(c)
+      }).replace(/'/g,"&#39;")})'>
+        <div class="cs-api-result-badge">⛳</div>
+        <div class="cs-api-result-info">
+          <div class="cs-api-result-name">${c.club_name||c.name||'Unknown Course'}</div>
+          <div class="cs-api-result-meta">${loc} · ${holes} holes</div>
+        </div>
+        <div class="cs-api-result-par">${par}<span>PAR</span></div>
+      </div>`;
+    }).join('');
+}
+
+function buildHolesFromApi(c) {
+  // Try to extract real hole data from API response structure
+  try {
+    const tee = c.tees?.male?.tees?.[0];
+    if(tee?.hole_details?.length) {
+      return tee.hole_details.map((h,i)=>({
+        n: h.hole || i+1,
+        par: h.par || 4,
+        yds: h.yardage || h.distance || 400,
+        name: `Hole ${h.hole||i+1}`
+      }));
+    }
+  } catch(e) {}
+  // Generate plausible holes based on total par
+  return generatePlausibleHoles(c.par||72, c.tees?.male?.tees?.[0]?.total_yards||6500);
+}
+
+function generatePlausibleHoles(totalPar, totalYards) {
+  // Distribute par and yardage across 18 holes realistically
+  const templates = {
+    72: [4,5,4,3,4,3,4,5,4, 4,4,3,5,4,4,3,4,5],
+    71: [4,4,4,3,5,3,4,4,4, 4,4,3,4,5,4,3,4,4],
+    70: [4,4,3,4,4,3,4,5,3, 4,4,3,5,4,4,3,4,4],
+  };
+  const pars = templates[totalPar] || templates[72];
+  const avgYds = totalYards / 18;
+  return pars.map((par,i)=>{
+    const base = par===3 ? 150+Math.random()*80 : par===5 ? 490+Math.random()*120 : 360+Math.random()*100;
+    return { n:i+1, par, yds: Math.round(base * (totalYards/(avgYds*18))), name:`Hole ${i+1}` };
+  });
+}
+
+function renderLocalResults(courses, list, query) {
+  list.innerHTML = `<div class="cs-demo-note"><strong>Search tip:</strong> Add your free API key via "Live Data" to search 40,000+ real courses. Showing matching local courses below.</div>` +
+    `<div class="cs-section-label">Matching Courses</div>` +
+    courses.map(courseCardHTML).join('');
+}
+
+function renderDemoResults(query, list) {
+  // Generate plausible fake results to show what live search looks like
+  const demoResults = [
+    {name:`${query} Golf Club`, location:'Searching…', par:72, yds:6800, holes:18},
+    {name:`${query} Country Club`, location:'Searching…', par:71, yds:6400, holes:18},
+    {name:`The ${query} Course`, location:'Searching…', par:72, yds:7100, holes:18},
+  ];
+  list.innerHTML = `<div class="cs-demo-note"><strong>Live search unavailable</strong> — network is sandboxed in this demo. In production with a valid API key, real results for "${query}" would appear here.</div>` +
+    `<div class="cs-section-label">Demo Results (simulated)</div>` +
+    demoResults.map((r,i)=>`
+    <div class="cs-api-result" style="opacity:0.5;pointer-events:none">
+      <div class="cs-api-result-badge">🔒</div>
+      <div class="cs-api-result-info">
+        <div class="cs-api-result-name">${r.name}</div>
+        <div class="cs-api-result-meta">Requires API key · ${r.holes} holes</div>
+      </div>
+      <div class="cs-api-result-par">${r.par}<span>PAR</span></div>
+    </div>`).join('') +
+    `<div style="text-align:center;padding:20px;font-size:12px;color:var(--text-muted)">No local matches for "${query}"</div>` +
+    COURSES.slice(0,3).map(c=>`<div class="cs-section-label" style="margin-top:8px">Or try a featured course:</div>${courseCardHTML(c)}`).slice(0,2).join('');
+}
+
+function selectApiCourse(courseObj) {
+  // courseObj is already a fully formed course data object from API
+  activeCourse = courseObj;
+  startNewRound();
+}
+
+// ─── COURSE SELECT (original local) ───
+function renderCourseList() {
+  const recent = COURSES.filter(c=>RECENT.includes(c.id));
+  document.getElementById('recent-courses').innerHTML = recent.map(courseCardHTML).join('');
+  document.getElementById('all-courses').innerHTML = COURSES.map(courseCardHTML).join('');
+  renderFeaturesCard();
+  updateApiButtonState();
+}
+function courseCardHTML(c) {
+  return `<div class="course-card" onclick="selectCourse('${c.id}')">
+    <div class="course-card-icon">${c.logo}</div>
+    <div class="course-card-info">
+      <div class="course-card-name">${c.name}</div>
+      <div class="course-card-meta">${c.location} · ${(c.yardage||0).toLocaleString()} yds</div>
+    </div>
+    <div class="course-card-par">${c.par}<span>PAR</span></div>
+  </div>`;
+}
+function filterCourses(q) {
+  const filtered = COURSES.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())||c.location.toLowerCase().includes(q.toLowerCase()));
+  document.getElementById('all-courses').innerHTML = filtered.map(courseCardHTML).join('');
+}
+function selectCourse(id) {
+  activeCourse = COURSES.find(c=>c.id===id);
+  startNewRound();
+}
+function startNewRound() {
+  currentHoleIdx = 0;
+  holeShotsMap = {};
+  scoreMap = {};
+  puttMap = {};
+  girMap = {};
+  droppedPins = [];
+  tracerList = [];
+  shots = [];
+  clearSearch();
+  document.getElementById('screen-courses').classList.add('hidden');
+  document.getElementById('screen-main').classList.remove('hidden');
+  document.getElementById('sc-course-name').textContent = activeCourse.name + ' · Round 1';
+  initHole();
+  buildHoleNav();
+  updateHUD();
+  buildScorecardTable();
+  gpsReady = false;
+  document.getElementById('gps-dot').className = 'searching';
+  document.getElementById('gps-text').textContent = 'Acquiring GPS…';
+  initGPS();
+}
+function showCourseSelect() {
+  if(tracking) { openStopModal(); return; }
+  document.getElementById('screen-main').classList.add('hidden');
+  document.getElementById('screen-courses').classList.remove('hidden');
+}
+
+// ─── HOLE MANAGEMENT ───
+function currentHole() { return activeCourse.holes_data[currentHoleIdx]; }
+function initHole() {
+  teePos = {x:195,y:665};
+  playerPos = {...teePos};
+  playerTrail = [playerPos];
+  document.getElementById('track-btn').classList.remove('tracking');
+  document.getElementById('track-btn').querySelector('.tb-icon').textContent = '⛳';
+  document.getElementById('track-btn').querySelector('.tb-label').textContent = 'Track';
+  tracking = false;
+  renderShotsDrawer();
+  document.getElementById('next-hole-btn').style.display = 'none';
+}
+function buildHoleNav() {
+  const nav = document.getElementById('hole-nav');
+  nav.innerHTML = activeCourse.holes_data.map((h,i)=>`
+    <div class="hole-pill ${i===currentHoleIdx?'active':''}" onclick="jumpToHole(${i})">H${h.n}</div>`).join('');
+}
+function jumpToHole(idx) {
+  if(tracking) { showToast('⏸ Stop tracking before switching holes'); return; }
+  currentHoleIdx = idx;
+  tracerList = tracerList.filter(t=>t.holeIdx===idx);
+  buildHoleNav();
+  initHole();
+  updateHUD();
+}
+function nextHole() {
+  // If putts not yet logged for current hole, prompt before advancing
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  if(holeShots.length > 0 && puttMap[currentHoleIdx] === undefined) {
+    openPuttModal();
+    // After confirming putts, auto-advance — handled by a flag
+    pendingNextHole = true;
+    return;
+  }
+  advanceHole();
+}
+let pendingNextHole = false;
+function advanceHole() {
+  pendingNextHole = false;
+  if(currentHoleIdx < activeCourse.holes_data.length-1) {
+    currentHoleIdx++;
+    tracerList = [];
+    buildHoleNav();
+    initHole();
+    updateHUD();
+    buildScorecardTable();
+    showToast(`⛳ Hole ${currentHole().n} — Par ${currentHole().par}`);
+  } else {
+    showToast('🏆 Round complete!');
+  }
+}
+function updateHUD() {
+  const h = currentHole();
+  document.getElementById('stat-par').textContent = h.par;
+  document.getElementById('stat-yds').textContent = h.yds;
+  document.getElementById('course-pill-name').textContent = activeCourse.name.split(' ').slice(0,2).join(' ');
+  document.getElementById('course-pill-hole').textContent = `Hole ${h.n}`;
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  document.getElementById('stat-shots').textContent = holeShots.length;
+  const totalStrokes = Object.values(scoreMap).reduce((a,b)=>a+b,0);
+  const totalPar = Object.keys(scoreMap).reduce((a,k)=>a+(activeCourse.holes_data[k].par),0);
+  const diff = totalStrokes - totalPar;
+  const el = document.getElementById('stat-score');
+  el.textContent = diff===0?'E':diff>0?'+'+diff:diff;
+  el.style.color = diff<0?'#e84c3d':diff>0?'#4ca8e8':'#5ab85e';
+}
+
+// ─── TRACKING ───
+function toggleTracking() {
+  if(!activeCourse){showToast('Select a course first');return;}
+  if(!gpsReady){showToast('⏳ Waiting for GPS fix…');return;}
+  if(tracking) { openStopModal(); return; }
+  tracking = true;
+  const btn = document.getElementById('track-btn');
+  btn.classList.add('tracking');
+  btn.querySelector('.tb-icon').textContent = '⏹';
+  btn.querySelector('.tb-label').textContent = 'Stop';
+  document.getElementById('gps-dot').className = 'red';
+  document.getElementById('gps-text').textContent = 'Tracking…';
+  showToast('🟢 Tracking started');
+  startGPSTracking();
+}
+function openStopModal() { document.getElementById('stop-modal').classList.add('show'); }
+function closeStopModal() { document.getElementById('stop-modal').classList.remove('show'); }
+function confirmStop() {
+  closeStopModal();
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  if(holeShots.length > 0 && puttMap[currentHoleIdx] === undefined) {
+    stopTrackingInternal();
+    openPuttModal();
+  } else {
+    stopTrackingInternal();
+  }
+}
+function stopTrackingInternal() {
+  tracking = false;
+  moving = false;
+  stopGPSTracking();
+  clearInterval(cdInterval);
+  document.getElementById('countdown-card').classList.remove('show');
+  const btn = document.getElementById('track-btn');
+  btn.classList.remove('tracking');
+  btn.querySelector('.tb-icon').textContent = '⛳';
+  btn.querySelector('.tb-label').textContent = 'Track';
+  document.getElementById('gps-dot').className = '';
+  document.getElementById('gps-text').textContent = 'GPS Active';
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  if(holeShots.length > 0) {
+    scoreMap[currentHoleIdx] = holeShots.length + (puttMap[currentHoleIdx]||0);
+    document.getElementById('next-hole-btn').style.display = 'block';
+    buildScorecardTable();
+    updateHUD();
+  }
+  showToast('⏹ Tracking stopped');
+  saveRoundToStorage();
+}
+
+// ─── PUTT MODAL ───
+function inferPutts() {
+  // Smart inference based on approach shot characteristics and hole par
+  const h = currentHole();
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  const lastShot = holeShots[holeShots.length-1];
+  const shotCount = holeShots.length;
+  const par = h.par;
+
+  // Base inference from approach distance / shot type
+  let guess = 2; // default tour average
+  let reason = 'Tour average';
+
+  if(lastShot) {
+    if(lastShot.club === 'PT') {
+      // Already logged a putt as a shot — default 1
+      guess = 1; reason = 'Putt already logged';
+    } else if(lastShot.type === 'ground' && lastShot.yds < 30) {
+      guess = 1; reason = 'Close chip — likely 1-putt';
+    } else if(lastShot.type === 'high' && lastShot.yds < 50) {
+      guess = 1; reason = 'Short lofted approach';
+    } else if(lastShot.yds > 80) {
+      guess = 2; reason = 'Long approach, 2 putts avg';
+    } else if(lastShot.yds > 120) {
+      guess = 3; reason = 'Very long approach';
+    }
+  }
+
+  // If approaching par on shots, nudge toward 2
+  if(shotCount === par - 2) { guess = 2; reason = 'GIR — 2-putt for par'; }
+  if(shotCount === par - 1) { guess = 1; reason = 'One inside GIR — birdie chance'; }
+  if(shotCount >= par)      { guess = 2; reason = 'Scrambling — standard 2-putt'; }
+  if(shotCount > par + 1)   { guess = 1; reason = 'Damage control — limit putts'; }
+
+  inferredPutts = guess;
+  return { guess, reason };
+}
+
+function openPuttModal() {
+  selectedPutts = null;
+  selectedGIR = 'yes';
+  document.querySelectorAll('.putt-btn').forEach(b=>b.classList.remove('sel','inference-match'));
+  document.getElementById('putt-confirm-btn').disabled = true;
+  document.getElementById('gir-yes').classList.add('sel');
+  document.getElementById('gir-no').classList.remove('sel');
+
+  const { guess, reason } = inferPutts();
+
+  // Update inference badge
+  document.getElementById('putt-inference-text').textContent = `${reason} — ${guess} putt${guess!==1?'s':''} suggested`;
+
+  // Mark the inferred button
+  const inferredBtn = document.querySelector(`.putt-btn[data-putts="${guess}"]`);
+  if(inferredBtn) inferredBtn.classList.add('inference-match');
+
+  // Set badge labels
+  document.getElementById('p-badge-1').textContent = guess===1 ? '✦ suggested' : '';
+  document.getElementById('p-badge-2').textContent = guess===2 ? '✦ suggested' : 'avg';
+  document.getElementById('p-badge-3').textContent = guess===3 ? '✦ suggested' : '';
+  document.getElementById('p-badge-4').textContent = guess===4 ? '✦ suggested' : '';
+
+  // Auto-select the inferred value
+  const autoBtn = document.querySelector(`.putt-btn[data-putts="${guess}"]`);
+  if(autoBtn) { selectPutts(autoBtn); }
+
+  // Smart GIR inference: GIR = reached green in par - 2 shots or fewer
+  const h = currentHole();
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  const girAuto = holeShots.length <= h.par - 2;
+  if(!girAuto) selectGIR('no');
+
+  document.getElementById('putt-modal').classList.add('show');
+}
+
+function selectPutts(el) {
+  document.querySelectorAll('.putt-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedPutts = parseInt(el.dataset.putts);
+  document.getElementById('putt-confirm-btn').disabled = false;
+}
+
+function selectGIR(val) {
+  selectedGIR = val;
+  document.getElementById('gir-yes').classList.toggle('sel', val==='yes');
+  document.getElementById('gir-no').classList.toggle('sel', val==='no');
+}
+
+function confirmPutts() {
+  if(selectedPutts === null) return;
+  puttMap[currentHoleIdx] = selectedPutts;
+  girMap[currentHoleIdx] = selectedGIR === 'yes';
+  document.getElementById('putt-modal').classList.remove('show');
+
+  // Add putt shots to hole shots for visual tracer
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  const puttLabel = selectedPutts === 1 ? '1 putt 🔥' : `${selectedPutts} putts`;
+  for(let i=0;i<selectedPutts;i++){
+    const putt = {
+      num: holeShots.length+1,
+      type:'ground', club:'PT', dist:0,
+      yds: Math.round(8+Math.random()*12),
+      from:{...playerPos},
+      to:{x:playerPos.x+(Math.random()-.5)*20, y:playerPos.y+(Math.random()-.5)*20},
+      holeIdx:currentHoleIdx,
+      tracerPts:[],
+      animProg:1,
+      isPutt:true
+    };
+    holeShotsMap[currentHoleIdx].push(putt);
+  }
+
+  // Final score = approach shots + putts
+  const totalStrokes = (holeShotsMap[currentHoleIdx]||[]).filter(s=>!s.isPutt).length + selectedPutts;
+  scoreMap[currentHoleIdx] = totalStrokes;
+  document.getElementById('next-hole-btn').style.display = 'block';
+  buildScorecardTable();
+  updateHUD();
+  renderShotsDrawer();
+
+  const girStr = girMap[currentHoleIdx] ? '🟢 GIR' : '❌ No GIR';
+  showToast(`⛳ ${puttLabel} logged · ${girStr}`);
+  saveRoundToStorage();
+  if(pendingNextHole) { setTimeout(advanceHole, 600); }
+}
+
+function skipPutts() {
+  document.getElementById('putt-modal').classList.remove('show');
+  const holeShots = holeShotsMap[currentHoleIdx]||[];
+  if(holeShots.length > 0) {
+    scoreMap[currentHoleIdx] = holeShots.length;
+    document.getElementById('next-hole-btn').style.display = 'block';
+    buildScorecardTable();
+    updateHUD();
+  }
+  showToast('Putts skipped for this hole');
+}
+// ═══════════════════════════════════════════════════════
+// ─── REAL GPS ENGINE ───
+// ═══════════════════════════════════════════════════════
+
+// GPS state
+let gpsWatchId = null;
+let lastGPSPos = null;        // {lat, lng, accuracy, timestamp}
+let gpsPositions = [];        // rolling buffer of recent positions for speed calc
+let stopTimer = null;         // setTimeout handle for stop detection
+let isMovingGPS = false;
+
+// Coordinate system:
+// We project WGS-84 lat/lng to canvas pixels using a simple equirectangular
+// projection centered on the tee position of the current hole.
+// 1 degree lat ≈ 111,000m; 1 degree lng ≈ 111,000m * cos(lat)
+// Canvas is 390×844px representing the hole (~450 yards max = ~411m).
+// Scale: canvas pixels per metre — calibrated to hole yardage.
+
+let gpsOrigin = null;  // {lat, lng} — set to tee when tracking starts
+
+function setGPSOrigin(lat, lng) {
+  gpsOrigin = {lat, lng};
+}
+
+function latLngToCanvas(lat, lng) {
+  if(!gpsOrigin) return {x: 195, y: 665};
+  // Metres offset from origin
+  const mLat = (lat - gpsOrigin.lat) * 111320;
+  const mLng = (lng - gpsOrigin.lng) * 111320 * Math.cos(gpsOrigin.lat * Math.PI / 180);
+  // On the canvas: origin (tee) = {195, 665}, pin is up (lower Y)
+  // North = up on canvas (decreasing Y), East = right (increasing X)
+  // The hole runs roughly north, so we map:
+  //   mLat positive (north) → decreasing Y (toward pin)
+  //   mLng positive (east)  → increasing X
+  // Scale: hole ~400 yards = ~365m should span ~550px (665→115)
+  const pixPerMetre = 550 / 365;
+  const canvasX = 195 + mLng * pixPerMetre;
+  const canvasY = 665 - mLat * pixPerMetre;
+  return {x: Math.round(canvasX), y: Math.round(canvasY)};
+}
+
+function metresToYards(m) { return m * 1.09361; }
+
+function distanceBetweenMetres(lat1, lng1, lat2, lng2) {
+  // Haversine
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── GPS INIT — request permission and get first fix ───
+function initGPS() {
+  if(!('geolocation' in navigator)) {
+    // Device has no GPS — fall back to manual/sim mode
+    gpsReady = true;
+    document.getElementById('gps-dot').className = '';
+    document.getElementById('gps-text').textContent = 'GPS unavailable';
+    showToast('⚠️ No GPS — use manual mode');
+    startPlayerSim(); // fall back to sim
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      lastGPSPos = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        timestamp: pos.timestamp
+      };
+      gpsReady = true;
+      document.getElementById('gps-dot').className = '';
+      const acc = Math.round(pos.coords.accuracy);
+      document.getElementById('gps-text').textContent = `GPS ±${acc}m`;
+      showToast(`📡 GPS locked ±${acc}m — ready to track`);
+      // Save origin at tee for this hole
+      setGPSOrigin(lastGPSPos.lat, lastGPSPos.lng);
+      playerPos = latLngToCanvas(lastGPSPos.lat, lastGPSPos.lng);
+    },
+    err => {
+      // Permission denied or unavailable
+      gpsReady = true; // allow manual use
+      document.getElementById('gps-dot').className = '';
+      document.getElementById('gps-text').textContent = 'GPS denied';
+      const msg = err.code === 1
+        ? '⚠️ GPS permission denied. Enable in Settings → Safari → Location.'
+        : '⚠️ GPS unavailable — using manual mode';
+      showToast(msg);
+      // Show a persistent GPS permission banner if denied
+      if(err.code === 1) showGPSPermissionBanner();
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    }
+  );
+}
+
+function showGPSPermissionBanner() {
+  const existing = document.getElementById('gps-permission-banner');
+  if(existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'gps-permission-banner';
+  banner.style.cssText = `
+    position:absolute;bottom:230px;left:16px;right:16px;z-index:35;
+    background:rgba(232,76,61,0.15);border:1px solid rgba(232,76,61,0.4);
+    border-radius:14px;padding:12px 16px;backdrop-filter:blur(12px);
+    font-size:12px;color:#f0ede4;line-height:1.5;pointer-events:all;cursor:pointer;
+  `;
+  banner.innerHTML = `
+    <div style="font-weight:700;margin-bottom:4px">📍 GPS Permission Required</div>
+    <div style="opacity:.7">Go to <strong>Settings → Safari → Location</strong> and set to "Allow". Then reload LINKS.</div>
+  `;
+  banner.onclick = () => banner.remove();
+  document.getElementById('map-ui').appendChild(banner);
+}
+
+// ─── START GPS TRACKING — continuous watch ───
+function startGPSTracking() {
+  if(!('geolocation' in navigator)) {
+    startPlayerSim();
+    return;
+  }
+
+  // Set the GPS origin to current position (tee box)
+  if(lastGPSPos) {
+    setGPSOrigin(lastGPSPos.lat, lastGPSPos.lng);
+    playerPos = {x: 195, y: 665}; // tee position on canvas
+    playerTrail = [{...playerPos}];
+  }
+
+  isMovingGPS = false;
+  gpsPositions = [];
+
+  gpsWatchId = navigator.geolocation.watchPosition(
+    onGPSUpdate,
+    onGPSError,
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 2000    // accept positions up to 2s old
+    }
+  );
+}
+
+function stopGPSTracking() {
+  if(gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
+  if(stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+  isMovingGPS = false;
+}
+
+// ─── CORE GPS UPDATE HANDLER ───
+function onGPSUpdate(pos) {
+  if(!tracking) return;
+
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const acc = pos.coords.accuracy;
+  const ts  = pos.timestamp;
+
+  // Ignore very inaccurate fixes (>25m) to reduce noise
+  if(acc > 25) {
+    document.getElementById('gps-text').textContent = `Weak GPS ±${Math.round(acc)}m`;
+    return;
+  }
+
+  const newPos = {lat, lng, accuracy: acc, timestamp: ts};
+
+  // Calculate movement from last position
+  let distMoved = 0;
+  if(lastGPSPos) {
+    distMoved = distanceBetweenMetres(lastGPSPos.lat, lastGPSPos.lng, lat, lng);
+  }
+
+  lastGPSPos = newPos;
+  gpsPositions.push(newPos);
+  if(gpsPositions.length > 20) gpsPositions.shift();
+
+  // Update canvas position
+  const canvasPos = latLngToCanvas(lat, lng);
+  playerPos = canvasPos;
+  playerTrail.push({...playerPos});
+  if(playerTrail.length > 500) playerTrail.shift();
+
+  // Update GPS accuracy display
+  document.getElementById('gps-text').textContent = `GPS ±${Math.round(acc)}m`;
+
+  // ── Stop detection ──
+  // We consider the player "stopped" if they've moved less than 3m in the last 5s.
+  // This is more reliable than a single position check.
+  const MOVE_THRESHOLD_M = 3;  // metres
+  const wasMoving = isMovingGPS;
+
+  if(distMoved > MOVE_THRESHOLD_M) {
+    // Clear any pending stop timer — they're moving
+    isMovingGPS = true;
+    if(stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+    document.getElementById('gps-dot').className = 'red';
+    document.getElementById('gps-text').textContent = `Moving`;
+    // Hide countdown if shown
+    document.getElementById('countdown-card').classList.remove('show');
+    clearInterval(cdInterval);
+  } else if(isMovingGPS || !stopTimer) {
+    // They just stopped — start the stop timer
+    isMovingGPS = false;
+    document.getElementById('gps-dot').className = 'stopped';
+    document.getElementById('gps-text').textContent = 'Stopped';
+    if(!stopTimer) {
+      stopTimer = setTimeout(() => {
+        stopTimer = null;
+        if(!tracking) return;
+        // Confirm still stopped before triggering
+        if(!isMovingGPS) startCountdown();
+      }, 3000); // 3 second buffer before countdown starts
+    }
+  }
+
+  // Auto-save position to storage periodically
+  savePositionToStorage(lat, lng, ts);
+}
+
+function onGPSError(err) {
+  if(!tracking) return;
+  const msgs = {1:'GPS denied',2:'GPS unavailable',3:'GPS timeout'};
+  document.getElementById('gps-text').textContent = msgs[err.code] || 'GPS error';
+  // Don't crash the app — just show the error
+}
+
+// ─── SPEED CALCULATION ───
+// Returns speed in km/h based on recent GPS positions
+function getSpeedKmh() {
+  if(gpsPositions.length < 2) return 0;
+  const recent = gpsPositions.slice(-5);
+  const first = recent[0], last = recent[recent.length-1];
+  const dt = (last.timestamp - first.timestamp) / 1000; // seconds
+  if(dt < 0.5) return 0;
+  const dist = distanceBetweenMetres(first.lat, first.lng, last.lat, last.lng);
+  return (dist / dt) * 3.6;
+}
+
+// ─── FALLBACK SIMULATION (when GPS unavailable) ───
+// Kept as fallback for devices/browsers without GPS
+let moveSimInterval = null;
+function startPlayerSim() {
+  clearInterval(moveSimInterval);
+  simulateMoveSegment();
+}
+function simulateMoveSegment() {
+  if(!tracking) return;
+  const targetX = 130 + Math.random()*130;
+  const targetY = 170 + Math.random()*300;
+  const steps = 35 + Math.floor(Math.random()*25);
+  const dx = (targetX - playerPos.x)/steps;
+  const dy = (targetY - playerPos.y)/steps;
+  moving = true;
+  let step = 0;
+  moveSimInterval = setInterval(()=>{
+    if(!tracking){clearInterval(moveSimInterval);return;}
+    playerPos.x += dx + (Math.random()-.5)*2;
+    playerPos.y += dy + (Math.random()-.5)*2;
+    playerTrail.push({...playerPos});
+    if(playerTrail.length > 300) playerTrail.shift();
+    step++;
+    if(step >= steps) {
+      clearInterval(moveSimInterval);
+      moving = false;
+      document.getElementById('gps-dot').className = 'stopped';
+      document.getElementById('gps-text').textContent = 'Stopped';
+      startCountdown();
+    }
+  }, 90);
+}
+
+// ─── dismissCountdown — resume GPS watching (not sim) ───
+function dismissCountdown() {
+  clearInterval(cdInterval);
+  document.getElementById('countdown-card').classList.remove('show');
+  document.getElementById('gps-dot').className = 'red';
+  document.getElementById('gps-text').textContent = 'Tracking…';
+  isMovingGPS = false;
+  stopTimer = null;
+  // GPS watch is still running — no need to restart it
+  // For sim fallback:
+  if(!gpsWatchId && tracking) setTimeout(()=>simulateMoveSegment(), 600);
+}
+
+// ═══════════════════════════════════════════════════════
+// ─── LOCALSTORAGE PERSISTENCE ───
+// ═══════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'links_round_v1';
+
+function saveRoundToStorage() {
+  if(!activeCourse) return;
+  try {
+    const data = {
+      courseId: activeCourse.id,
+      courseName: activeCourse.name,
+      date: new Date().toISOString().split('T')[0],
+      currentHoleIdx,
+      holeShotsMap,
+      scoreMap,
+      puttMap,
+      girMap,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {
+    // Storage full or unavailable — silent fail
+  }
+}
+
+function savePositionToStorage(lat, lng, ts) {
+  // Lightweight position log — saves every ~10 updates
+  try {
+    const key = 'links_trail_v1';
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    existing.push({lat, lng, ts, hole: currentHoleIdx});
+    // Keep last 1000 positions (~1 per second for 16 minutes per hole)
+    if(existing.length > 1000) existing.splice(0, existing.length - 1000);
+    localStorage.setItem(key, JSON.stringify(existing));
+  } catch(e) {}
+}
+
+function loadRoundFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    // Only restore rounds from today
+    const today = new Date().toISOString().split('T')[0];
+    if(data.date !== today) return null;
+    return data;
+  } catch(e) { return null; }
+}
+
+function clearRoundStorage() {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('links_trail_v1');
+}
+
+// ─── RESUME PROMPT — shown on reload if round in progress ───
+function checkForSavedRound() {
+  const saved = loadRoundFromStorage();
+  if(!saved) return;
+  const course = COURSES.find(c=>c.id===saved.courseId);
+  if(!course) return;
+  const totalShots = Object.values(saved.scoreMap).reduce((a,b)=>a+b,0);
+  if(totalShots === 0) return;
+
+  // Show resume banner
+  const banner = document.createElement('div');
+  banner.id = 'resume-banner';
+  banner.style.cssText = `
+    position:absolute;inset:0;z-index:70;background:rgba(0,0,0,0.85);
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);
+  `;
+  banner.innerHTML = `
+    <div style="background:#111d12;border:1px solid rgba(255,255,255,0.12);border-radius:24px;
+      padding:28px 24px;width:340px;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">🏌️</div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:900;
+        color:#e8ca6e;margin-bottom:6px">Resume Round?</div>
+      <div style="font-size:13px;color:rgba(240,237,228,0.55);margin-bottom:6px">
+        ${saved.courseName}</div>
+      <div style="font-size:12px;color:rgba(240,237,228,0.4);margin-bottom:22px">
+        ${totalShots} shots logged · Hole ${saved.currentHoleIdx+1}</div>
+      <button onclick="resumeRound()" style="width:100%;padding:15px;border-radius:14px;
+        background:#c8a84b;border:none;color:#1a0f00;font-family:'Outfit',sans-serif;
+        font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+        cursor:pointer;margin-bottom:10px">Resume Round</button>
+      <button onclick="discardAndNew()" style="width:100%;padding:14px;border-radius:14px;
+        background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+        color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
+        font-weight:600;cursor:pointer">Start New Round</button>
+    </div>
+  `;
+  document.getElementById('root').appendChild(banner);
+
+  // Store reference for resumeRound
+  window._savedRound = saved;
+  window._savedCourse = course;
+}
+
+function resumeRound() {
+  const banner = document.getElementById('resume-banner');
+  if(banner) banner.remove();
+  const saved = window._savedRound;
+  const course = window._savedCourse;
+  if(!saved||!course) return;
+
+  activeCourse = course;
+  currentHoleIdx = saved.currentHoleIdx || 0;
+  holeShotsMap = saved.holeShotsMap || {};
+  scoreMap = saved.scoreMap || {};
+  puttMap = saved.puttMap || {};
+  girMap = saved.girMap || {};
+  droppedPins = [];
+  tracerList = [];
+  shots = [];
+
+  document.getElementById('screen-courses').classList.add('hidden');
+  document.getElementById('screen-main').classList.remove('hidden');
+  document.getElementById('sc-course-name').textContent = activeCourse.name + ' · Round 1';
+
+  initHole();
+  buildHoleNav();
+  updateHUD();
+  buildScorecardTable();
+  renderShotsDrawer();
+
+  gpsReady = false;
+  document.getElementById('gps-dot').className = 'searching';
+  document.getElementById('gps-text').textContent = 'Acquiring GPS…';
+  initGPS();
+
+  showToast('✅ Round resumed — hole ' + (currentHoleIdx+1));
+}
+
+function discardAndNew() {
+  const banner = document.getElementById('resume-banner');
+  if(banner) banner.remove();
+  clearRoundStorage();
+}
+
+// ─── COUNTDOWN ───
+function startCountdown() {
+  cdSecs = cdDuration;
+  const card = document.getElementById('countdown-card');
+  card.classList.add('show');
+  const arc = document.getElementById('cd-arc');
+  const circ = 138.2;
+  clearInterval(cdInterval);
+  cdInterval = setInterval(()=>{
+    cdSecs--;
+    document.getElementById('cd-secs').textContent = cdSecs;
+    document.getElementById('cd-num').textContent = cdSecs;
+    arc.style.strokeDashoffset = circ*(1-cdSecs/cdDuration);
+    if(cdSecs <= 0) {
+      clearInterval(cdInterval);
+      card.classList.remove('show');
+      openShotModal();
+    }
+  },1000);
+}
+function skipCountdown() {
+  clearInterval(cdInterval);
+  document.getElementById('countdown-card').classList.remove('show');
+  openShotModal();
+}
+function setTimer(el) {
+  document.querySelectorAll('.timer-opt').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  cdDuration = parseInt(el.dataset.secs);
+  document.getElementById('cur-timer-label').textContent = el.textContent;
+  showToast(`⏱ Timer set to ${el.textContent}`);
+}
+
+// ─── SHOT MODAL ───
+function openShotModal() {
+  selectedTrajType = null; selectedClubData = null;
+  document.querySelectorAll('.traj-btn,.club-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('confirm-btn').disabled = true;
+  document.getElementById('modal-backdrop').classList.add('show');
+  clearPreviewCanvas();
+}
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('show');
+  document.getElementById('gps-dot').className = '';
+  document.getElementById('gps-text').textContent = 'Tracking…';
+  if(tracking) setTimeout(()=>simulateMoveSegment(), 800);
+}
+function selectTraj(el) {
+  document.querySelectorAll('.traj-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedTrajType = el.dataset.type;
+  checkConfirm();
+  drawPreviewArc();
+}
+function selectClub(el) {
+  document.querySelectorAll('.club-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedClubData = {club:el.dataset.club, dist:parseInt(el.dataset.dist)};
+  checkConfirm();
+  if(selectedTrajType) drawPreviewArc();
+}
+function checkConfirm() {
+  document.getElementById('confirm-btn').disabled = !(selectedTrajType && selectedClubData);
+}
+function clearPreviewCanvas() {
+  const c = document.getElementById('shot-preview');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle='rgba(255,255,255,0.02)';
+  ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle='rgba(255,255,255,0.05)';
+  ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,c.height-12);ctx.lineTo(c.width,c.height-12);ctx.stroke();
+}
+function drawPreviewArc() {
+  const c = document.getElementById('shot-preview');
+  const ctx = c.getContext('2d');
+  clearPreviewCanvas();
+  if(!selectedTrajType) return;
+  const W=c.width,H=c.height;
+  const arcHeights = {high:0.75,line:0.45,low:0.25,ground:0.1};
+  const colors = {high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b'};
+  const ah = arcHeights[selectedTrajType];
+  const color = colors[selectedTrajType];
+  const pts=[];
+  const N=60;
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const x=24+t*(W-48);
+    let y;
+    if(selectedTrajType==='ground'){y=H-14-4*Math.sin(Math.PI*t*2)*t;}
+    else{y=H-14-ah*(H-20)*Math.sin(Math.PI*t);}
+    pts.push({x,y});
+  }
+  ctx.beginPath();
+  ctx.strokeStyle=color;
+  ctx.lineWidth=2.5;
+  ctx.shadowColor=color;
+  ctx.shadowBlur=6;
+  ctx.moveTo(pts[0].x,pts[0].y);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  // Ball dot
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(pts[pts.length-1].x,pts[pts.length-1].y,4,0,Math.PI*2);ctx.fill();
+  // Label
+  if(selectedClubData) {
+    ctx.fillStyle=color;
+    ctx.font='600 11px Outfit';
+    ctx.fillText(`${selectedClubData.club} · ~${selectedClubData.dist}yds`,W/2-36,H-2);
+  }
+}
+
+// ─── CONFIRM SHOT ───
+function confirmShot() {
+  if(!selectedTrajType||!selectedClubData) return;
+  document.getElementById('modal-backdrop').classList.remove('show');
+  const fromPt = shots.length > 0 && holeShotsMap[currentHoleIdx]?.length > 0
+    ? holeShotsMap[currentHoleIdx][holeShotsMap[currentHoleIdx].length-1].to
+    : {...teePos};
+  const toPt = {...playerPos};
+  const distPx = Math.hypot(toPt.x-fromPt.x, toPt.y-fromPt.y);
+  const yds = selectedClubData.dist > 0 ? Math.round(selectedClubData.dist*(0.85+Math.random()*.3)) : Math.round(distPx*0.8);
+  const shotObj = {
+    num:(holeShotsMap[currentHoleIdx]||[]).length+1,
+    type:selectedTrajType,
+    club:selectedClubData.club,
+    dist:selectedClubData.dist,
+    yds,
+    from:{...fromPt},
+    to:{...toPt},
+    holeIdx:currentHoleIdx,
+    tracerPts:buildTracerPts(fromPt,toPt,selectedTrajType),
+    animProg:0
+  };
+  if(!holeShotsMap[currentHoleIdx]) holeShotsMap[currentHoleIdx]=[];
+  holeShotsMap[currentHoleIdx].push(shotObj);
+  tracerList.push(shotObj);
+  animateTracer(shotObj);
+  // Play swing avatar animation on map
+  setTimeout(()=>playSwingOnMap(shotObj), 100);
+  renderShotsDrawer();
+  updateHUD();
+  document.getElementById('gps-dot').className='';
+  document.getElementById('gps-text').textContent='Tracking…';
+  showToast(`✅ Shot ${shotObj.num} logged — ${yds}y ${selectedClubData.club}`);
+  saveRoundToStorage();
+  if(tracking) setTimeout(()=>simulateMoveSegment(), 1000);
+}
+
+// ─── TRACER ANIMATION ───
+function buildTracerPts(from, to, type) {
+  const pts=[];
+  const N=80;
+  const dx=to.x-from.x, dy=to.y-from.y;
+  const dist=Math.hypot(dx,dy);
+  const arcH={high:0.55,line:0.22,low:0.1,ground:0.04}[type]||0.2;
+  const scatter={high:0.04,line:0.06,low:0.05,ground:0.07}[type]||0.05;
+  const nx=-dy/dist, ny=dx/dist;
+  const lat=(Math.random()-.5)*dist*scatter;
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const bx=from.x+dx*t+nx*lat*Math.sin(Math.PI*t);
+    const by=from.y+dy*t+ny*lat*Math.sin(Math.PI*t);
+    let arcY;
+    if(type==='ground'){arcY=-dist*arcH*Math.sin(Math.PI*t*0.8)*(1-t*.4);}
+    else{arcY=-dist*arcH*Math.sin(Math.PI*t);}
+    pts.push({x:bx,y:by+arcY});
+  }
+  return pts;
+}
+function animateTracer(shot) {
+  const dur={high:2000,line:1600,low:1400,ground:1200}[shot.type]||1600;
+  const start=performance.now();
+  function frame(now){
+    shot.animProg=Math.min((now-start)/dur,1);
+    if(shot.animProg<1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ─── MAP RENDERING ───
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+function drawHoleLayout() {
+  const W=390,H=844;
+  ctx.clearRect(0,0,W,H);
+  // Sky/rough bg
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0d1a0e');
+  bg.addColorStop(1,'#081208');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  // Grid lines (subtle)
+  ctx.strokeStyle='rgba(255,255,255,0.02)';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // Rough texture
+  ctx.fillStyle='rgba(30,60,28,0.35)';
+  ctx.fillRect(0,0,W,H);
+  // Fairway shape
+  ctx.save();
+  const fairwayPath = new Path2D();
+  fairwayPath.moveTo(145,280);
+  fairwayPath.bezierCurveTo(115,280,100,380,110,480);
+  fairwayPath.bezierCurveTo(120,560,160,620,195,650);
+  fairwayPath.bezierCurveTo(230,620,270,560,280,480);
+  fairwayPath.bezierCurveTo(290,380,275,280,245,280);
+  fairwayPath.bezierCurveTo(240,170,225,120,215,110);
+  fairwayPath.bezierCurveTo(205,120,150,170,145,280);
+  const fairGrad=ctx.createLinearGradient(195,100,195,680);
+  fairGrad.addColorStop(0,'#2d6030');
+  fairGrad.addColorStop(0.5,'#3a7a3d');
+  fairGrad.addColorStop(1,'#2d5c2f');
+  ctx.fillStyle=fairGrad;
+  ctx.fill(fairwayPath);
+  ctx.restore();
+  // Green
+  const gGrad=ctx.createRadialGradient(210,145,0,210,145,60);
+  gGrad.addColorStop(0,'#4db850');
+  gGrad.addColorStop(0.6,'#3da040');
+  gGrad.addColorStop(1,'#2d8030');
+  ctx.fillStyle=gGrad;
+  ctx.beginPath();ctx.ellipse(210,148,58,44,0.1,0,Math.PI*2);ctx.fill();
+  // Fringe
+  ctx.strokeStyle='rgba(70,180,72,0.3)';ctx.lineWidth=4;
+  ctx.beginPath();ctx.ellipse(210,148,64,50,0.1,0,Math.PI*2);ctx.stroke();
+  // Bunkers
+  const bunkers=[{x:288,y:290,rx:26,ry:16,rot:0.4},{x:102,y:340,rx:20,ry:14,rot:-0.3},{x:235,y:170,rx:18,ry:12,rot:0.2},{x:175,y:510,rx:14,ry:10,rot:0}];
+  bunkers.forEach(b=>{
+    const bg=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.rx);
+    bg.addColorStop(0,'#d4b880');bg.addColorStop(1,'#a08050');
+    ctx.fillStyle=bg;
+    ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.rot);
+    ctx.beginPath();ctx.ellipse(0,0,b.rx,b.ry,0,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+  // Dotted center line
+  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=1;ctx.setLineDash([5,9]);
+  ctx.beginPath();ctx.moveTo(195,660);ctx.lineTo(210,155);ctx.stroke();
+  ctx.setLineDash([]);
+  // Flag
+  ctx.fillStyle='#cc2222';
+  ctx.fillRect(209,98,2,38);
+  ctx.fillStyle='#ff6633';
+  ctx.beginPath();ctx.moveTo(211,98);ctx.lineTo(228,106);ctx.lineTo(211,114);ctx.fill();
+  // Hole number ring
+  ctx.strokeStyle='rgba(200,168,75,0.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(195,665,14,0,Math.PI*2);ctx.stroke();
+  ctx.fillStyle='rgba(200,168,75,0.15)';ctx.fill();
+  ctx.fillStyle='rgba(200,168,75,0.9)';
+  ctx.font='700 10px Outfit';ctx.textAlign='center';
+  const h=currentHole()?currentHole():activeCourse.holes_data[0];
+  ctx.fillText(`H${h.n}`,195,669);ctx.textAlign='left';
+  // Distance yardage markers
+  ctx.fillStyle='rgba(255,255,255,0.06)';
+  ctx.font='10px Outfit';
+  [[195,430,'150'],[195,350,'200'],[195,270,'250']].forEach(([x,y,t])=>{
+    ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.fillText(t,x+7,y+4);
+    ctx.fillStyle='rgba(255,255,255,0.06)';
+  });
+}
+function drawTrail() {
+  if(playerTrail.length<2) return;
+  ctx.save();
+  ctx.strokeStyle='rgba(200,168,75,0.35)';
+  ctx.lineWidth=1.5;ctx.setLineDash([3,6]);
+  ctx.beginPath();ctx.moveTo(playerTrail[0].x,playerTrail[0].y);
+  playerTrail.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.stroke();ctx.setLineDash([]);ctx.restore();
+}
+function drawTracers() {
+  const colors={high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b'};
+  tracerList.forEach(s=>{
+    const pts=s.tracerPts;
+    if(!pts||pts.length<2) return;
+    const visLen=Math.floor(pts.length*Math.min(s.animProg,1));
+    if(visLen<2) return;
+    const color=colors[s.type]||'#fff';
+    ctx.save();
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;
+    ctx.shadowColor=color;ctx.shadowBlur=s.animProg>=1?4:8;
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<visLen;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke();
+    ctx.shadowBlur=0;
+    if(s.animProg>=1) {
+      const lp=pts[pts.length-1];
+      ctx.fillStyle=color;
+      ctx.beginPath();ctx.arc(lp.x,lp.y,5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.font='600 10px Outfit';
+      ctx.fillText(`${s.club} ${s.yds}y`,lp.x+8,lp.y-5);
+    } else {
+      const bp=pts[Math.max(0,visLen-1)];
+      ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=12;
+      ctx.beginPath();ctx.arc(bp.x,bp.y,5,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;
+    }
+    ctx.restore();
+  });
+}
+function drawPins() {
+  droppedPins.filter(p=>p.holeIdx===currentHoleIdx).forEach(p=>{
+    ctx.font='22px serif';
+    ctx.fillText('📍',p.x-11,p.y+4);
+    if(p.label) {
+      ctx.fillStyle='rgba(255,255,255,0.8)';
+      ctx.font='600 10px Outfit';
+      ctx.fillText(p.label,p.x+2,p.y-8);
+    }
+  });
+}
+function drawPlayer() {
+  if(!tracking&&!tracerList.length) return;
+  const p=playerPos;
+  ctx.save();
+  // pulse ring
+  if(tracking){
+    ctx.strokeStyle='rgba(200,168,75,0.25)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(p.x,p.y,20,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.shadowColor='rgba(200,168,75,0.7)';ctx.shadowBlur=16;
+  ctx.fillStyle='#c8a84b';
+  ctx.beginPath();ctx.arc(p.x,p.y,9,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#1a0f00';
+  ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+function renderLoop() {
+  drawHoleLayout();
+  drawTrail();
+  drawTracers();
+  drawPins();
+  drawPlayer();
+  animRaf=requestAnimationFrame(renderLoop);
+}
+
+// ─── PIN DROP ───
+function enterPinMode() {
+  pinMode=true;
+  document.getElementById('pin-mode-banner').style.display='block';
+  document.getElementById('pin-btn').classList.add('active');
+  canvas.style.cursor='crosshair';
+  showToast('📍 Tap the map to drop a shot pin');
+}
+function cancelPinMode() {
+  pinMode=false;
+  document.getElementById('pin-mode-banner').style.display='none';
+  document.getElementById('pin-btn').classList.remove('active');
+  canvas.style.cursor='default';
+}
+canvas.addEventListener('click',e=>{
+  if(!pinMode) return;
+  const rect=canvas.getBoundingClientRect();
+  const x=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const y=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const holeShots=holeShotsMap[currentHoleIdx]||[];
+  const label=`Shot ${holeShots.length+1}`;
+  droppedPins.push({x,y,holeIdx:currentHoleIdx,label});
+  cancelPinMode();
+  showToast(`📍 Pin dropped — ${label}`);
+});
+
+// ─── SHOTS DRAWER ───
+function renderShotsDrawer() {
+  const list=document.getElementById('shots-list');
+  const holeShots=holeShotsMap[currentHoleIdx]||[];
+  if(holeShots.length===0){
+    list.innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:8px 0 16px">No shots yet — press Track to begin</div>';
+    return;
+  }
+  const typeColors={high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b'};
+  const typeEmoji={high:'🏔️',line:'➡️',low:'↘️',ground:'🏃'};
+  list.innerHTML=holeShots.map(s=>`
+    <div class="shot-card" onclick="highlightShot(${s.num-1})">
+      <div class="shot-card-num">${s.num}</div>
+      <div class="shot-card-type" style="color:${typeColors[s.type]}">${typeEmoji[s.type]} ${s.type.toUpperCase()}</div>
+      <div class="shot-card-club">${s.club}</div>
+      <div class="shot-card-dist">${s.yds}<span> yds</span></div>
+    </div>`).join('');
+}
+function highlightShot(idx) {
+  const s=(holeShotsMap[currentHoleIdx]||[])[idx];
+  if(!s) return;
+  showToast(`Shot ${s.num}: ${s.club} — ${s.yds}y ${s.type}`);
+}
+
+// ─── SCORECARD ───
+function showScorecard() {
+  buildScorecardTable();
+  document.getElementById('screen-scorecard').classList.remove('hidden','slide-up');
+}
+function hideScorecard() {
+  document.getElementById('screen-scorecard').classList.add('hidden','slide-up');
+}
+function buildScorecardTable() {
+  const tbody=document.getElementById('sc-tbody');
+  let totalStrokes=0,totalPar=0,totalPutts=0,girCount=0;
+  tbody.innerHTML='';
+  activeCourse.holes_data.forEach((h,i)=>{
+    const strokes=scoreMap[i]||0;
+    const putts=puttMap[i];
+    const gir=girMap[i];
+    const diff=strokes-h.par;
+    let scoreHTML='<span class="score-cell score-empty">—</span>';
+    if(strokes>0){
+      let cls='score-par';
+      if(diff<=-2)cls='score-eagle';
+      else if(diff===-1)cls='score-birdie';
+      else if(diff===1)cls='score-bogey';
+      else if(diff>=2)cls='score-double';
+      scoreHTML=`<span class="score-cell ${cls}">${strokes}</span>`;
+    }
+    const diffStr=strokes>0?(diff===0?'E':diff>0?`+${diff}`:diff):'—';
+    const puttsHTML=putts!==undefined
+      ? `<span style="color:${putts===1?'#e84c3d':putts===2?'var(--text-secondary)':'#4ca8e8'};font-weight:700">${putts}</span>${gir?'<span style="font-size:9px;color:var(--green-light);margin-left:3px">●</span>':''}`
+      : '<span style="color:var(--text-muted)">—</span>';
+    const isActive=i===currentHoleIdx;
+    totalStrokes+=strokes;
+    if(strokes>0) totalPar+=h.par;
+    if(putts!==undefined) totalPutts+=putts;
+    if(gir===true) girCount++;
+    const row=document.createElement('tr');
+    if(isActive) row.className='active-hole';
+    row.innerHTML=`<td>${h.n}<span style="font-size:10px;color:var(--text-muted);display:block;font-weight:400">${h.name||''}</span></td><td>${h.par}</td><td>${h.yds}</td><td>${scoreHTML}</td><td style="text-align:center">${puttsHTML}</td><td style="font-size:12px;color:${diff>0?'#4ca8e8':diff<0?'#e84c3d':'var(--text-secondary)'}">${diffStr}</td>`;
+    row.onclick=()=>showHoleDetail(i);
+    tbody.appendChild(row);
+  });
+  // Totals
+  const totRow=document.createElement('tr');
+  totRow.className='sc-totals-row';
+  const totDiff=totalStrokes-totalPar;
+  const totStr=totalStrokes===0?'—':(totDiff===0?'E':totDiff>0?`+${totDiff}`:totDiff);
+  const totPuttsStr=totalPutts>0?totalPutts:'—';
+  totRow.innerHTML=`<td>TOTAL</td><td>${activeCourse.par}</td><td>${activeCourse.yardage}</td><td style="font-family:'Playfair Display';font-size:16px;color:var(--gold)">${totalStrokes||'—'}</td><td style="font-size:14px;font-weight:700;color:var(--blue)">${totPuttsStr}</td><td style="font-size:13px;color:${totDiff>0?'#4ca8e8':totDiff<0?'#e84c3d':'var(--green-light)'}">${totStr}</td>`;
+  tbody.appendChild(totRow);
+  // Summary cards
+  const holesPlayed=Object.keys(scoreMap).length;
+  const avgPutts=holesPlayed>0?(totalPutts/holesPlayed).toFixed(1):'—';
+  document.getElementById('sc-total-score').textContent=totalStrokes===0?'E':(totDiff===0?'E':totDiff>0?`+${totDiff}`:totDiff);
+  document.getElementById('sc-total-shots').textContent=totalStrokes||0;
+  document.getElementById('sc-holes-played').textContent=holesPlayed;
+  document.getElementById('sc-total-putts').textContent=totalPutts||0;
+  document.getElementById('sc-avg-putts').textContent=avgPutts;
+  document.getElementById('sc-gir-count').textContent=girCount;
+  document.getElementById('sc-course-name').textContent=activeCourse.name+' · Round 1';
+}
+function showHoleDetail(idx) {
+  const h=activeCourse.holes_data[idx];
+  const hShots=(holeShotsMap[idx]||[]).filter(s=>!s.isPutt);
+  const putts=puttMap[idx];
+  const gir=girMap[idx];
+  const detail=document.getElementById('sc-hole-detail');
+  const typeEmoji={high:'🏔️',line:'➡️',low:'↘️',ground:'🏃',putt:'⛳'};
+  detail.classList.add('show');
+  document.getElementById('sc-detail-title').textContent=`Hole ${h.n} — Par ${h.par} · ${h.yds}y`;
+  if(hShots.length===0&&putts===undefined){
+    document.getElementById('sc-detail-shots').innerHTML='<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Not yet played</div>';
+    return;
+  }
+  let html = hShots.map(s=>`
+    <div class="sc-shot-row">
+      <div class="sc-shot-n">${s.num}</div>
+      <div class="sc-shot-info">
+        <div class="sc-shot-name">${typeEmoji[s.type]||'🏌️'} ${s.type.charAt(0).toUpperCase()+s.type.slice(1)} — ${s.club}</div>
+        <div class="sc-shot-meta">${s.type+' trajectory'}</div>
+      </div>
+      <div class="sc-shot-yds">${s.yds}<span>y</span></div>
+    </div>`).join('');
+
+  if(putts !== undefined) {
+    const puttColor = putts===1?'#e84c3d':putts===2?'var(--text-secondary)':'#4ca8e8';
+    const puttEmoji = putts===1?'🔥':putts===2?'⛳':'😬';
+    const girBadge = gir
+      ? '<span style="background:rgba(90,184,94,0.15);color:var(--green-light);font-size:10px;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600">GIR ●</span>'
+      : '<span style="background:rgba(232,76,61,0.12);color:#ff9080;font-size:10px;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600">No GIR</span>';
+    html += `<div class="sc-shot-row" style="border-top:1px solid rgba(255,255,255,0.07);margin-top:4px">
+      <div class="sc-shot-n" style="color:${puttColor}">${puttEmoji}</div>
+      <div class="sc-shot-info">
+        <div class="sc-shot-name" style="color:${puttColor}">${putts} Putt${putts!==1?'s':''} on the green${girBadge}</div>
+        <div class="sc-shot-meta">Logged after approach</div>
+      </div>
+      <div class="sc-shot-yds" style="color:${puttColor}">${putts}<span>x</span></div>
+    </div>`;
+  } else {
+    html += `<div style="color:var(--text-muted);font-size:12px;padding:10px 0;font-style:italic">Putts not logged for this hole</div>`;
+  }
+
+  document.getElementById('sc-detail-shots').innerHTML=html;
+  detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ─── AVATAR PROFILE STATE ───
+let avatarProfile = {
+  heightCm: 178,
+  hand: 'right',
+  build: 'average',
+  heightUnit: 'imperial'
+};
+let swingAnimRaf = null;
+let swingPhaseTime = 0;
+let currentSwingShot = null;
+let currentPhase = 'address';
+
+// ─── PROFILE SCREEN ───
+function setHeightUnit(unit, el) {
+  document.querySelectorAll('.hu-opt').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  avatarProfile.heightUnit = unit;
+  updateHeightDisplay(document.getElementById('height-slider').value);
+}
+function onHeightChange(val) {
+  avatarProfile.heightCm = parseInt(val);
+  updateHeightDisplay(val);
+  drawAvatarPreview();
+}
+function updateHeightDisplay(cm) {
+  const el = document.getElementById('height-val');
+  if(avatarProfile.heightUnit === 'imperial') {
+    const totalIn = Math.round(cm / 2.54);
+    const ft = Math.floor(totalIn/12), inch = totalIn%12;
+    el.textContent = `${ft}'${inch}"`;
+  } else {
+    el.textContent = `${cm} cm`;
+  }
+}
+function selectHand(el) {
+  document.querySelectorAll('.hand-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  avatarProfile.hand = el.dataset.hand;
+  drawAvatarPreview();
+}
+function selectBuild(el) {
+  document.querySelectorAll('.build-btn').forEach(b=>b.classList.remove('sel'));
+  el.classList.add('sel');
+  avatarProfile.build = el.dataset.build;
+  drawAvatarPreview();
+}
+function saveProfile() {
+  document.getElementById('screen-profile').classList.add('hidden');
+  document.getElementById('screen-courses').classList.remove('hidden');
+  document.getElementById('avatar-hud').classList.add('show');
+  drawAvatarHUD();
+  showToast(`Avatar set — ${avatarProfile.heightCm}cm ${avatarProfile.hand}-handed golfer`);
+}
+
+// ─── AVATAR PROPORTIONS ───
+// Returns biomechanically accurate proportions derived from height
+function getAvatarProps(heightCm, build, scale) {
+  // Based on Vitruvian proportions: total height = 8 head heights
+  const headH = heightCm / 8;
+  const s = scale; // pixels per cm
+  const buildW = {slim:0.85, average:1.0, stocky:1.25}[build]||1;
+  return {
+    totalH:   heightCm * s,
+    headR:    (headH/2) * s,
+    neckH:    (headH*0.3) * s,
+    torsoH:   (headH*2.5) * s,
+    torsoW:   (headH*1.5) * buildW * s,
+    hipW:     (headH*1.3) * buildW * s,
+    armLen:   (headH*3.0) * s,    // upper + lower arm
+    forearmL: (headH*1.4) * s,
+    upperArmL:(headH*1.6) * s,
+    legH:     (headH*4.0) * s,    // full leg height
+    thighH:   (headH*2.1) * s,
+    shinH:    (headH*1.9) * s,
+    footL:    (headH*0.9) * s,
+    shoulderW:(headH*1.8) * buildW * s,
+    // Club length scales with height: driver ~46", shorter for irons
+    // Average club length at 5'10" = 46" driver
+    clubLenBase: heightCm * 0.65 * s,
+  };
+}
+
+// ─── DRAW STATIC GOLFER AVATAR (address position) ───
+function drawGolfer(ctx, cx, cy, heightCm, build, hand, phase, scale, clubType, alpha=1) {
+  const p = getAvatarProps(heightCm, build, scale);
+  const flip = hand === 'left' ? -1 : 1;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(cx, cy);
+
+  // Swing phase angles (all in radians)
+  const phases = {
+    address:  { spine:-0.08,  lArm:0.3,  rArm:-0.3, club:0.2,  hipRot:0,    kneeB:0.15 },
+    takeaway: { spine:-0.15,  lArm:0.9,  rArm:0.2,  club:0.8,  hipRot:0.2,  kneeB:0.12 },
+    top:      { spine:-0.25,  lArm:2.1,  rArm:0.8,  club:2.3,  hipRot:0.4,  kneeB:0.10 },
+    impact:   { spine: 0.05,  lArm:-0.1, rArm:-0.6, club:-0.15,hipRot:-0.3, kneeB:0.20 },
+    follow:   { spine: 0.20,  lArm:-1.5, rArm:-1.8, club:-2.1, hipRot:-0.6, kneeB:0.08 },
+  };
+  const ph = phases[phase] || phases.address;
+
+  // Ground reference: feet at cy=0 (we've translated)
+  const groundY = 0;
+  const legTopY = -p.legH;
+  const torsoBottomY = legTopY;
+  const torsoTopY = torsoBottomY - p.torsoH;
+  const neckTopY = torsoTopY - p.neckH;
+  const headY = neckTopY - p.headR;
+
+  // Skin & shirt palette
+  const skinCol = '#d4956a';
+  const shirtCol = '#2a5a8c';
+  const pantCol = '#1a2a3a';
+  const shoeCol = '#1a1a1a';
+  const glovCol = '#e8ca6e';
+  const clubCol = '#8a8a7a';
+  const gripCol = '#2a1a0a';
+  const hairCol = '#2a1a0a';
+
+  // ── Feet/Shoes ──
+  ctx.fillStyle = shoeCol;
+  // Left foot
+  ctx.beginPath();
+  ctx.ellipse(-p.hipW*0.35, groundY-4*scale, p.footL*0.5, 5*scale, 0.1*flip, 0, Math.PI*2);
+  ctx.fill();
+  // Right foot
+  ctx.beginPath();
+  ctx.ellipse(p.hipW*0.35*flip, groundY-4*scale, p.footL*0.5, 5*scale, -0.1*flip, 0, Math.PI*2);
+  ctx.fill();
+
+  // ── Legs ──
+  ctx.strokeStyle = pantCol;
+  ctx.lineWidth = p.torsoW * 0.32;
+  ctx.lineCap = 'round';
+  const kneeFlexL = ph.kneeB;
+  const kneeFlexR = ph.kneeB * 0.8;
+  // Left leg
+  const lKneeX = -p.hipW*0.35 + Math.sin(kneeFlexL)*p.thighH*0.1;
+  const lKneeY = legTopY + p.thighH;
+  ctx.beginPath();
+  ctx.moveTo(-p.hipW*0.35, legTopY);
+  ctx.quadraticCurveTo(lKneeX-3*scale, lKneeY-5*scale, -p.hipW*0.35, groundY-8*scale);
+  ctx.stroke();
+  // Right leg
+  const rKneeX = p.hipW*0.35*flip + Math.sin(kneeFlexR)*p.thighH*0.1*flip;
+  const rKneeY = legTopY + p.thighH;
+  ctx.beginPath();
+  ctx.moveTo(p.hipW*0.35*flip, legTopY);
+  ctx.quadraticCurveTo(rKneeX+3*scale*flip, rKneeY-5*scale, p.hipW*0.35*flip, groundY-8*scale);
+  ctx.stroke();
+
+  // ── Torso (with spine tilt) ──
+  ctx.save();
+  ctx.rotate(ph.spine * flip);
+  // Hips
+  ctx.fillStyle = pantCol;
+  ctx.beginPath();
+  ctx.ellipse(0, torsoBottomY, p.hipW*0.55, 8*scale, 0, 0, Math.PI*2);
+  ctx.fill();
+  // Torso body
+  ctx.fillStyle = shirtCol;
+  ctx.beginPath();
+  ctx.moveTo(-p.torsoW*0.48, torsoBottomY);
+  ctx.bezierCurveTo(-p.torsoW*0.52, torsoBottomY-p.torsoH*0.4, -p.shoulderW*0.48, torsoTopY+2*scale, -p.shoulderW*0.46, torsoTopY);
+  ctx.lineTo(p.shoulderW*0.46*flip, torsoTopY);
+  ctx.bezierCurveTo(p.shoulderW*0.48*flip, torsoTopY+2*scale, p.torsoW*0.52*flip, torsoBottomY-p.torsoH*0.4, p.torsoW*0.48*flip, torsoBottomY);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── Arms ──
+  // Club length per club type
+  const clubLens = {D:1.0, '3W':0.97, '5W':0.95, '3H':0.93, '4i':0.92, '5i':0.91, '6i':0.90, '7i':0.89, '8i':0.88, '9i':0.87, PW:0.86, GW:0.85, SW:0.84, LW:0.83, PT:0.88};
+  const clubScale = clubLens[clubType] || 0.9;
+  const clubLen = p.clubLenBase * clubScale;
+
+  const shoulderLX = -p.shoulderW*0.46;
+  const shoulderRX = p.shoulderW*0.46*flip;
+  const shoulderY = torsoTopY + 2*scale;
+
+  // Lead arm (left for right-hander)
+  const leadShoulderX = hand==='right' ? shoulderLX : shoulderRX;
+  const trailShoulderX = hand==='right' ? shoulderRX : shoulderLX;
+  const leadAngle = ph.lArm * flip;
+  const trailAngle = ph.rArm * flip;
+
+  // Lead arm
+  ctx.strokeStyle = shirtCol;
+  ctx.lineWidth = p.headR * 0.55;
+  ctx.lineCap = 'round';
+  const leadElbowX = leadShoulderX + Math.cos(leadAngle - Math.PI/2) * p.upperArmL * 0.9;
+  const leadElbowY = shoulderY + Math.sin(leadAngle - Math.PI/2) * p.upperArmL * 0.9;
+  ctx.beginPath(); ctx.moveTo(leadShoulderX, shoulderY); ctx.lineTo(leadElbowX, leadElbowY); ctx.stroke();
+  // Lead forearm
+  ctx.strokeStyle = skinCol;
+  const leadWristX = leadElbowX + Math.cos(leadAngle - Math.PI/2 + 0.2*flip) * p.forearmL * 0.85;
+  const leadWristY = leadElbowY + Math.sin(leadAngle - Math.PI/2 + 0.2*flip) * p.forearmL * 0.85;
+  ctx.beginPath(); ctx.moveTo(leadElbowX, leadElbowY); ctx.lineTo(leadWristX, leadWristY); ctx.stroke();
+
+  // Trail arm
+  ctx.strokeStyle = shirtCol;
+  ctx.lineWidth = p.headR * 0.52;
+  const trailElbowX = trailShoulderX + Math.cos(trailAngle - Math.PI/2) * p.upperArmL * 0.85;
+  const trailElbowY = shoulderY + Math.sin(trailAngle - Math.PI/2) * p.upperArmL * 0.85;
+  ctx.beginPath(); ctx.moveTo(trailShoulderX, shoulderY); ctx.lineTo(trailElbowX, trailElbowY); ctx.stroke();
+  // Trail forearm
+  ctx.strokeStyle = skinCol;
+  const trailWristX = trailElbowX + Math.cos(trailAngle - Math.PI/2 - 0.15*flip) * p.forearmL * 0.8;
+  const trailWristY = trailElbowY + Math.sin(trailAngle - Math.PI/2 - 0.15*flip) * p.forearmL * 0.8;
+  ctx.beginPath(); ctx.moveTo(trailElbowX, trailElbowY); ctx.lineTo(trailWristX, trailWristY); ctx.stroke();
+
+  // ── Club ──
+  const clubAngle = ph.club * flip;
+  const clubHeadX = leadWristX + Math.cos(clubAngle) * clubLen;
+  const clubHeadY = leadWristY + Math.sin(clubAngle) * clubLen;
+  // Grip
+  ctx.strokeStyle = gripCol;
+  ctx.lineWidth = 4*scale;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(leadWristX, leadWristY);
+  const midClubX = leadWristX + Math.cos(clubAngle)*clubLen*0.15;
+  const midClubY = leadWristY + Math.sin(clubAngle)*clubLen*0.15;
+  ctx.lineTo(midClubX, midClubY);
+  ctx.stroke();
+  // Shaft
+  ctx.strokeStyle = clubCol;
+  ctx.lineWidth = 2.5*scale;
+  ctx.beginPath();
+  ctx.moveTo(midClubX, midClubY);
+  ctx.lineTo(clubHeadX, clubHeadY);
+  ctx.stroke();
+  // Club head
+  ctx.fillStyle = '#c0c0b0';
+  ctx.strokeStyle = '#888880';
+  ctx.lineWidth = 1.5*scale;
+  if(clubType==='D'||clubType==='3W'||clubType==='5W') {
+    ctx.beginPath(); ctx.ellipse(clubHeadX, clubHeadY, 8*scale, 5*scale, clubAngle+Math.PI/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  } else if(clubType==='PT') {
+    ctx.beginPath(); ctx.rect(clubHeadX-3*scale, clubHeadY-8*scale, 6*scale, 10*scale); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.ellipse(clubHeadX, clubHeadY, 5*scale, 7*scale, clubAngle+Math.PI/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  }
+
+  // Glove on lead hand
+  ctx.fillStyle = glovCol;
+  ctx.beginPath(); ctx.arc(leadWristX, leadWristY, p.headR*0.28, 0, Math.PI*2); ctx.fill();
+
+  // ── Neck ──
+  ctx.fillStyle = skinCol;
+  ctx.beginPath();
+  ctx.rect(-5*scale, neckTopY, 10*scale, p.neckH);
+  ctx.fill();
+
+  // ── Head ──
+  ctx.fillStyle = skinCol;
+  ctx.beginPath(); ctx.arc(0, headY, p.headR, 0, Math.PI*2); ctx.fill();
+  // Hair
+  ctx.fillStyle = hairCol;
+  ctx.beginPath();
+  ctx.arc(0, headY, p.headR, Math.PI, Math.PI*2);
+  ctx.fill();
+  // Cap brim
+  ctx.fillStyle = shirtCol;
+  ctx.beginPath();
+  ctx.ellipse(p.headR*0.3*flip, headY-p.headR*0.1, p.headR*1.1, p.headR*0.25, 0, 0, Math.PI*2);
+  ctx.fill();
+  // Face
+  ctx.fillStyle = '#c08860';
+  ctx.beginPath(); ctx.arc(p.headR*0.1*flip, headY+p.headR*0.05, p.headR*0.55, 0, Math.PI*2); ctx.fill();
+
+  // ── Shadow on ground ──
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(0, groundY+2*scale, p.torsoW*0.6, 5*scale, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.restore(); // end torso rotation
+  ctx.restore(); // end translate
+}
+
+// ─── DRAW AVATAR PREVIEW (profile screen) ───
+function drawAvatarPreview() {
+  const c = document.getElementById('avatar-preview-canvas');
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,200,200);
+  // Grass ground
+  ctx.fillStyle='rgba(45,92,47,0.3)'; ctx.fillRect(0,160,200,40);
+  ctx.strokeStyle='rgba(90,184,94,0.4)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(0,160); ctx.lineTo(200,160); ctx.stroke();
+  const h = avatarProfile.heightCm;
+  // Scale to fit in 200px canvas, max height ~7'
+  const scale = 140 / 213;
+  const avatarPixH = h * scale;
+  const cx = 100, cy = 160;
+  drawGolfer(ctx, cx, cy, h, avatarProfile.build, avatarProfile.hand, 'address', scale, 'D', 1);
+}
+
+// ─── AVATAR HUD MINI ───
+function drawAvatarHUD() {
+  const c = document.getElementById('avatar-hud-canvas');
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,44,44);
+  const scale = 30/213;
+  drawGolfer(ctx, 22, 42, avatarProfile.heightCm, avatarProfile.build, avatarProfile.hand, 'address', scale, 'D', 1);
+}
+
+// ─── SWING ANIMATION ON MAP ───
+function playSwingOnMap(shot) {
+  currentSwingShot = shot;
+  const overlay = document.getElementById('swing-overlay');
+  const swingCanvas = document.getElementById('swing-canvas');
+  const sCtx = swingCanvas.getContext('2d');
+  overlay.classList.add('show');
+  const phases = ['address','takeaway','top','impact','follow'];
+  const phaseDurs = {
+    D:    [400, 600, 800, 200, 500],
+    PT:   [300, 200, 0,   150, 250],
+    default:[350, 500, 700, 180, 450]
+  };
+  const durs = phaseDurs[shot.club] || phaseDurs.default;
+  const scale = 48 / 213; // avatar scale on map overlay
+  const px = shot.from.x, py = shot.from.y;
+  // Swing direction angle from shot direction
+  const dx = shot.to.x - shot.from.x;
+  const dy = shot.to.y - shot.from.y;
+  const shotAngle = Math.atan2(dy, dx);
+  let phaseIdx = 0;
+  let phaseStart = performance.now();
+  function animSwing(now) {
+    if(phaseIdx >= phases.length) {
+      overlay.classList.remove('show');
+      showSwingReplay(shot);
+      return;
+    }
+    const elapsed = now - phaseStart;
+    const dur = durs[phaseIdx] || 400;
+    if(elapsed >= dur) {
+      phaseIdx++;
+      phaseStart = now;
+      swingAnimRaf = requestAnimationFrame(animSwing);
+      return;
+    }
+    sCtx.clearRect(0,0,390,844);
+    // Dark vignette
+    const grad = sCtx.createRadialGradient(px,py,30,px,py,200);
+    grad.addColorStop(0,'rgba(0,0,0,0)');
+    grad.addColorStop(1,'rgba(0,0,0,0.55)');
+    sCtx.fillStyle=grad;
+    sCtx.fillRect(0,0,390,844);
+    // Draw swing arc guide
+    const arcR = getAvatarProps(avatarProfile.heightCm, avatarProfile.build, scale).clubLenBase * (phaseDurs[shot.club]?1.0:0.9);
+    sCtx.save();
+    sCtx.translate(px, py);
+    sCtx.rotate(shotAngle);
+    sCtx.strokeStyle='rgba(200,168,75,0.2)';
+    sCtx.lineWidth=2;
+    sCtx.setLineDash([4,6]);
+    sCtx.beginPath();
+    sCtx.arc(0, -arcR*0.3, arcR*1.1, -Math.PI*0.9, Math.PI*0.05);
+    sCtx.stroke();
+    sCtx.setLineDash([]);
+    sCtx.restore();
+    // Draw golfer avatar at this phase
+    sCtx.save();
+    sCtx.translate(px, py);
+    sCtx.rotate(shotAngle - Math.PI/2);
+    drawGolfer(sCtx, 0, 0, avatarProfile.heightCm, avatarProfile.build, avatarProfile.hand, phases[phaseIdx], scale, shot.club, 1);
+    sCtx.restore();
+    // Phase label
+    sCtx.fillStyle='rgba(200,168,75,0.9)';
+    sCtx.font='700 11px Outfit';
+    sCtx.textAlign='center';
+    sCtx.fillText(phases[phaseIdx].toUpperCase(), px, py - getAvatarProps(avatarProfile.heightCm, avatarProfile.build, scale).totalH - 12*scale*3);
+    sCtx.textAlign='left';
+    swingAnimRaf = requestAnimationFrame(animSwing);
+  }
+  swingAnimRaf = requestAnimationFrame(animSwing);
+}
+
+// ─── SWING REPLAY PANEL (side-view) ───
+function showSwingReplay(shot) {
+  currentSwingShot = shot;
+  const panel = document.getElementById('swing-replay');
+  panel.classList.add('show');
+  document.getElementById('swing-replay-meta').textContent = `Shot ${shot.num} · ${shot.club} · ${shot.yds}y`;
+  // Populate stat cells with club/type-appropriate values
+  const tempos = {D:'3:1', '3W':'3:1', '5W':'2.8:1', '7i':'2.5:1', PW:'2:1', SW:'1.8:1', PT:'1.5:1'};
+  const arcs   = {D:'Wide', '3W':'Wide', '5W':'Wide', '7i':'Mid', '9i':'Compact', PW:'Compact', SW:'Compact', PT:'Short'};
+  const planes = {high:'Upright', line:'On', low:'Flat', ground:'Flat'};
+  const rels   = {high:'Early', line:'Mid', low:'Late', ground:'Late'};
+  document.getElementById('srs-tempo').textContent = tempos[shot.club]||'2.5:1';
+  document.getElementById('srs-arc').textContent   = arcs[shot.club]||'Mid';
+  document.getElementById('srs-plane').textContent  = planes[shot.type]||'On';
+  document.getElementById('srs-release').textContent= rels[shot.type]||'Mid';
+  setSwingPhase(document.querySelector('.phase-seg[data-phase="address"]'));
+  drawSideView(shot, 'address');
+}
+function setSwingPhase(el) {
+  document.querySelectorAll('.phase-seg').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  currentPhase = el.dataset.phase;
+  if(currentSwingShot) drawSideView(currentSwingShot, currentPhase);
+}
+function drawSideView(shot, phase) {
+  const c = document.getElementById('swing-side-canvas');
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  const W=348, H=180;
+  ctx.clearRect(0,0,W,H);
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#0a1a0c'); sky.addColorStop(1,'#0d2010');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  // Ground
+  ctx.fillStyle='#2d5c2f';
+  ctx.fillRect(0,H-28,W,28);
+  ctx.fillStyle='#3a7a3d';
+  ctx.fillRect(0,H-26,W,4);
+  // Yardage trajectory ghost line
+  const colors = {high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b'};
+  const col = colors[shot.type]||'#fff';
+  const arcH = {high:0.55,line:0.25,low:0.1,ground:0.04}[shot.type]||0.2;
+  ctx.strokeStyle = col+'55';
+  ctx.lineWidth=1.5; ctx.setLineDash([3,5]);
+  ctx.beginPath();
+  for(let i=0;i<=60;i++){
+    const t=i/60;
+    const x=20+t*(W-40);
+    const y=(H-28)-(H-60)*arcH*Math.sin(Math.PI*t);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  // Draw golfer side-view at phase
+  const scale = (H-32) / 213;
+  const cx = 60, cy = H-28;
+  drawGolfer(ctx, cx, cy, avatarProfile.heightCm, avatarProfile.build, avatarProfile.hand, phase, scale, shot.club, 1);
+  // Ball position dot based on phase
+  const ballPhaseX = {address:62, takeaway:64, top:66, impact:64, follow:80};
+  const ballPhaseY = {address:H-26, takeaway:H-26, top:H-26, impact:H-26, follow:H-80};
+  const bx = ballPhaseX[phase]||62;
+  const by = ballPhaseY[phase]||(H-26);
+  ctx.fillStyle='#fff'; ctx.shadowColor='#fff'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.arc(bx,by,4,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  // Swing path arc for this phase  
+  if(phase==='top'||phase==='impact'||phase==='follow') {
+    const prop = getAvatarProps(avatarProfile.heightCm, avatarProfile.build, scale);
+    ctx.strokeStyle = 'rgba(200,168,75,0.4)';
+    ctx.lineWidth=1.5; ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(cx, cy-prop.legH-prop.torsoH*0.6, prop.clubLenBase*0.9, -Math.PI*0.95, -Math.PI*0.1, false);
+    ctx.stroke();
+  }
+  // Phase label
+  ctx.fillStyle='rgba(200,168,75,0.7)';
+  ctx.font='600 10px Outfit';
+  ctx.fillText(phase.charAt(0).toUpperCase()+phase.slice(1), W-60, 18);
+}
+function closeSwingReplay() {
+  document.getElementById('swing-replay').classList.remove('show');
+}
+function replayLastSwing() {
+  const allShots = Object.values(holeShotsMap).flat().filter(s=>!s.isPutt);
+  if(allShots.length===0){showToast('No shots to replay yet');return;}
+  showSwingReplay(allShots[allShots.length-1]);
+}
+
+// ─── TOAST ───
+let toastTimer=null;
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ─── INIT ───
+// Show profile screen first
+drawAvatarPreview();
+renderCourseList();
+renderLoop();
+
+// Register service worker for offline PWA support
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js', {scope: './'})
+    .then(reg => console.log('LINKS SW registered:', reg.scope))
+    .catch(err => console.log('LINKS SW failed (dev mode ok):', err));
+}
+
+// Wake Lock — keep screen on while on course
+// (Safari 16.4+ supports this; silently fails on older)
+let wakeLock = null;
+async function requestWakeLock() {
+  if('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch(e) {}
+  }
+}
+requestWakeLock();
+// Re-acquire wake lock when app becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') requestWakeLock();
+});
+
+// Check if there's a round in progress to resume
+setTimeout(checkForSavedRound, 800);
+</script>
+</body>
+</html>
