@@ -1224,7 +1224,7 @@ function advanceHole() {
     buildScorecardTable();
     showToast(`⛳ Hole ${currentHole().n} — Par ${currentHole().par}`);
   } else {
-    showToast('🏆 Round complete!');
+    completeRound();
   }
 }
 function updateHUD() {
@@ -1726,8 +1726,10 @@ function dismissCountdown() {
 // ─── LOCALSTORAGE PERSISTENCE ───
 // ═══════════════════════════════════════════════════════
 
-const STORAGE_KEY = 'links_round_v1';
+const STORAGE_KEY  = 'links_round_v1';   // active/resume key (today only)
+const HISTORY_PFX  = 'links_hist_';      // prefix for completed round history
 
+// ─── SAVE ACTIVE ROUND (resume key) ───
 function saveRoundToStorage() {
   if(!activeCourse) return;
   try {
@@ -1743,29 +1745,185 @@ function saveRoundToStorage() {
       savedAt: Date.now()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch(e) {
-    // Storage full or unavailable — silent fail
-  }
+  } catch(e) {}
 }
 
+// ─── SAVE POSITION TRAIL ───
 function savePositionToStorage(lat, lng, ts) {
-  // Lightweight position log — saves every ~10 updates
   try {
     const key = 'links_trail_v1';
     const existing = JSON.parse(localStorage.getItem(key) || '[]');
     existing.push({lat, lng, ts, hole: currentHoleIdx});
-    // Keep last 1000 positions (~1 per second for 16 minutes per hole)
     if(existing.length > 1000) existing.splice(0, existing.length - 1000);
     localStorage.setItem(key, JSON.stringify(existing));
   } catch(e) {}
 }
 
+// ─── SERIALIZE INTO REPLAY FORMAT ───
+// Converts tracker holeShotsMap → the ROUNDS entry format the replay expects
+function serializeRoundForReplay() {
+  const doglegForHole = (h) => {
+    // Use any stored dogleg, else guess from course name seed
+    const seed = h.n * 7 + (activeCourse.id?.charCodeAt(0)||1);
+    return ['right','left','none'][seed % 3];
+  };
+  const waterCourses = ['pebble','beach','torrey','ocean','lake','creek','pond','water'];
+  const courseHasWater = waterCourses.some(w => activeCourse.name.toLowerCase().includes(w));
+
+  const holes = activeCourse.holes_data.map((h, idx) => {
+    const appShots = (holeShotsMap[idx] || []).filter(s => !s.isPutt);
+    const putts    = puttMap[idx] ?? 2;
+    const gir      = girMap[idx]  ?? false;
+
+    // Build shots array in replay format
+    const shots = appShots.map(s => ({
+      club: s.club,
+      type: s.type === 'ground' ? 'ground' : s.type,
+      yds:  s.yds,
+      note: `${s.type.charAt(0).toUpperCase() + s.type.slice(1)} — ${s.club}`
+    }));
+    shots.push({ putts });
+
+    return {
+      n:      h.n,
+      par:    h.par,
+      yds:    h.yds,
+      name:   h.name || `Hole ${h.n}`,
+      dogleg: doglegForHole(h),
+      water:  courseHasWater && (idx % 3 === 0), // rough estimate
+      shots
+    };
+  });
+
+  const totalPar   = holes.reduce((a,h) => a + h.par, 0);
+  const totalScore = Object.values(scoreMap).reduce((a,b) => a + b, 0);
+
+  // Pick terrain theme by course name
+  const coastal = ['pebble','beach','torrey','ocean'].some(w => activeCourse.name.toLowerCase().includes(w));
+  const terrain = coastal ? 'coastal' : 'pines';
+
+  return {
+    id:          `real_${Date.now()}`,
+    courseName:  activeCourse.name,
+    date:        new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+    totalPar,
+    score:       totalScore || totalPar,
+    terrain,
+    holes,
+    _trackedRound: true   // flag so history UI can show a badge
+  };
+}
+
+// ─── COMPLETE ROUND — save to history, show completion modal ───
+function completeRound() {
+  stopTrackingInternal();
+  const replayRound = serializeRoundForReplay();
+
+  // Save to dated history key so the replay file can find it
+  const histKey = `${HISTORY_PFX}${replayRound.date.replace(/[, ]/g,'_')}_${Date.now()}`;
+  try {
+    localStorage.setItem(histKey, JSON.stringify(replayRound));
+  } catch(e) {
+    // Storage full — try to clear oldest history entries
+    pruneHistory();
+    try { localStorage.setItem(histKey, JSON.stringify(replayRound)); } catch(e2) {}
+  }
+
+  // Clear the resume key — round is done
+  clearRoundStorage();
+
+  // Show completion modal
+  showRoundCompleteModal(replayRound);
+}
+
+// ─── PRUNE OLDEST HISTORY (if storage full) ───
+function pruneHistory() {
+  const keys = getHistoryKeys().slice(0, 3); // remove 3 oldest
+  keys.forEach(k => localStorage.removeItem(k));
+}
+
+// ─── GET ALL HISTORY KEYS sorted oldest first ───
+function getHistoryKeys() {
+  const keys = [];
+  for(let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if(k && k.startsWith(HISTORY_PFX)) keys.push(k);
+  }
+  return keys.sort(); // ISO-ish date prefix sorts correctly
+}
+
+// ─── ROUND COMPLETE MODAL ───
+function showRoundCompleteModal(r) {
+  const diff  = r.score - r.totalPar;
+  const diffStr = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`;
+  const existing = document.getElementById('round-complete-modal');
+  if(existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'round-complete-modal';
+  modal.style.cssText = `
+    position:absolute;inset:0;z-index:80;background:rgba(0,0,0,0.88);
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);
+  `;
+  modal.innerHTML = `
+    <div style="background:linear-gradient(160deg,#111d12,#0a160b);border:1px solid rgba(200,168,75,0.3);
+      border-radius:28px;padding:32px 24px;width:346px;text-align:center;
+      box-shadow:0 0 60px rgba(200,168,75,0.15)">
+      <div style="font-size:48px;margin-bottom:10px">🏆</div>
+      <div style="font-family:'Playfair Display',serif;font-size:28px;font-weight:900;
+        color:#e8ca6e;line-height:1">Round Complete!</div>
+      <div style="font-size:13px;color:rgba(240,237,228,0.55);margin:6px 0 4px">${r.courseName}</div>
+      <div style="font-size:12px;color:rgba(240,237,228,0.35);margin-bottom:20px">${r.date}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:22px">
+        <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:12px 6px">
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:900;
+            color:${diff<0?'#e84c3d':diff>0?'#4ca8e8':'#5ab85e'}">${diffStr}</div>
+          <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;
+            color:rgba(240,237,228,0.4);margin-top:3px">Score</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:12px 6px">
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:900;
+            color:#e8ca6e">${r.score}</div>
+          <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;
+            color:rgba(240,237,228,0.4);margin-top:3px">Strokes</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border-radius:14px;padding:12px 6px">
+          <div style="font-family:'Playfair Display',serif;font-size:26px;font-weight:900;
+            color:#e8ca6e">${r.holes.length}</div>
+          <div style="font-size:9px;letter-spacing:1px;text-transform:uppercase;
+            color:rgba(240,237,228,0.4);margin-top:3px">Holes</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:rgba(240,237,228,0.5);margin-bottom:18px;
+        background:rgba(200,168,75,0.08);border-radius:10px;padding:10px 14px;line-height:1.5">
+        ✅ Round saved to history<br>
+        <span style="opacity:0.7">Open LINKS Replay to watch your cinematic round</span>
+      </div>
+      <button onclick="document.getElementById('round-complete-modal').remove();showScorecard();"
+        style="width:100%;padding:15px;border-radius:14px;background:#c8a84b;border:none;
+        color:#1a0f00;font-family:'Outfit',sans-serif;font-size:14px;font-weight:800;
+        letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">
+        View Scorecard
+      </button>
+      <button onclick="document.getElementById('round-complete-modal').remove();"
+        style="width:100%;padding:14px;border-radius:14px;
+        background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+        color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
+        font-weight:600;cursor:pointer">
+        Close
+      </button>
+    </div>
+  `;
+  document.getElementById('root').appendChild(modal);
+  showToast('🏆 Round saved to history!');
+}
+
+// ─── LOAD/CLEAR STORAGE ───
 function loadRoundFromStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return null;
     const data = JSON.parse(raw);
-    // Only restore rounds from today
     const today = new Date().toISOString().split('T')[0];
     if(data.date !== today) return null;
     return data;
@@ -1777,7 +1935,7 @@ function clearRoundStorage() {
   localStorage.removeItem('links_trail_v1');
 }
 
-// ─── RESUME PROMPT — shown on reload if round in progress ───
+// ─── RESUME PROMPT ───
 function checkForSavedRound() {
   const saved = loadRoundFromStorage();
   if(!saved) return;
@@ -1786,7 +1944,6 @@ function checkForSavedRound() {
   const totalShots = Object.values(saved.scoreMap).reduce((a,b)=>a+b,0);
   if(totalShots === 0) return;
 
-  // Show resume banner
   const banner = document.createElement('div');
   banner.id = 'resume-banner';
   banner.style.cssText = `
@@ -1814,8 +1971,6 @@ function checkForSavedRound() {
     </div>
   `;
   document.getElementById('root').appendChild(banner);
-
-  // Store reference for resumeRound
   window._savedRound = saved;
   window._savedCourse = course;
 }

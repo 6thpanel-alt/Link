@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>LINKS — Round Replay</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+:root{
+  --gold:#c8a84b;--gl:#e8ca6e;--white:#f0ede4;
+  --mu:rgba(240,237,228,0.42);--muf:rgba(240,237,228,0.22);
+  --card:rgba(4,12,5,0.72);--brd:rgba(255,255,255,0.1);
+  --red:#e84c3d;--blue:#4ca8e8;--teal:#40b8a0;--green:#3aaa3c;
+  --r:12px;--rl:20px
+}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Outfit',sans-serif;color:var(--white)}
+#root{width:390px;height:844px;position:relative;margin:0 auto;overflow:hidden;border-radius:44px;background:#040a05}
+#cv{position:absolute;inset:0;z-index:1;touch-action:none}
+
+/* ── TOP BAR ── */
+#top{position:absolute;top:0;left:0;right:0;z-index:20;padding:48px 18px 12px;
+  background:linear-gradient(180deg,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 60%,transparent 100%);
+  display:flex;align-items:center;gap:10px;pointer-events:all}
+.ib{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.09);border:1px solid var(--brd);
+  display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;flex-shrink:0;
+  transition:background .15s}
+.ib:active{background:rgba(255,255,255,0.18)}
+#tc{flex:1;text-align:center;min-width:0}
+#tt{font-family:'Playfair Display',serif;font-size:17px;font-weight:900;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ts{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mu);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── SHOT CARD ── */
+#sc{position:absolute;top:116px;left:14px;right:14px;z-index:20;
+  background:var(--card);border:1px solid var(--brd);border-radius:18px;
+  padding:12px 16px 10px;backdrop-filter:blur(20px);pointer-events:none;
+  transition:opacity .2s}
+#scl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--mu);font-weight:600}
+#sct{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;margin-top:2px;line-height:1.1}
+#scn{font-size:10px;color:var(--muf);margin-top:2px;font-style:italic;min-height:14px}
+#scs{display:flex;margin-top:8px;border-top:1px solid var(--brd);padding-top:8px}
+.ss{flex:1;text-align:center;border-right:1px solid var(--brd)}
+.ss:last-child{border-right:none}
+.ssv{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--gl);line-height:1}
+.ssl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--mu);margin-top:2px}
+#scp{margin-top:8px;height:2px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden}
+#scpf{height:100%;background:var(--gold);border-radius:1px;width:0%;transition:width .06s linear}
+
+/* ── CAMERA STRIP ── */
+#cams{position:absolute;z-index:20;bottom:222px;left:50%;transform:translateX(-50%);
+  display:flex;gap:3px;background:rgba(4,12,5,0.78);border:1px solid var(--brd);
+  border-radius:28px;padding:4px;backdrop-filter:blur(20px);pointer-events:all;
+  box-shadow:0 4px 24px rgba(0,0,0,0.5)}
+.cb{padding:7px 14px;border-radius:22px;font-size:10px;font-weight:700;color:var(--mu);
+  cursor:pointer;letter-spacing:.4px;transition:all .18s;white-space:nowrap;user-select:none}
+.cb:active{opacity:.7}
+.cb.on{background:var(--gold);color:#1a0f00;letter-spacing:.5px}
+
+/* ── PLAYBACK PANEL ── */
+#pb{position:absolute;bottom:0;left:0;right:0;z-index:20;padding:10px 16px 36px;
+  background:linear-gradient(0deg,rgba(0,0,0,0.96) 0%,rgba(0,0,0,0.7) 70%,transparent 100%);
+  pointer-events:all}
+#ss{display:flex;gap:5px;overflow-x:auto;padding:2px 0 10px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+#ss::-webkit-scrollbar{display:none}
+.st{flex-shrink:0;width:50px;background:rgba(255,255,255,0.05);border:1px solid var(--brd);
+  border-radius:10px;padding:6px 3px;text-align:center;cursor:pointer;
+  transition:all .15s;scroll-snap-align:start;user-select:none}
+.st.on{border-color:var(--gold);background:rgba(200,168,75,0.15)}
+.st:active{transform:scale(0.95)}
+.st-hn{font-size:8px;font-weight:700;color:var(--mu);letter-spacing:.5px;margin-bottom:1px}
+.st-n{font-family:'Playfair Display',serif;font-size:17px;font-weight:900;color:var(--gl);line-height:1}
+.st-c{font-size:9px;font-weight:700;color:var(--white);margin-top:1px}
+.st-y{font-size:8px;color:var(--mu)}
+.st-dot{width:5px;height:5px;border-radius:50%;margin:3px auto 0}
+
+/* progress bar */
+#pbl{display:flex;justify-content:space-between;font-size:9px;color:var(--mu);margin-bottom:5px;padding:0 2px}
+#pbb{width:100%;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;
+  position:relative;cursor:pointer;margin-bottom:13px;touch-action:none}
+#pbf{height:100%;background:linear-gradient(90deg,var(--gold),var(--gl));border-radius:3px;width:0%}
+#pbt{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:var(--gl);
+  transform:translate(-50%,-50%);left:0%;box-shadow:0 0 8px rgba(200,168,75,0.7);
+  pointer-events:none;transition:left .06s linear}
+#pbtk{position:absolute;inset:0;pointer-events:none}
+.tk{position:absolute;top:-3px;width:2px;height:12px;background:rgba(255,255,255,0.2);
+  transform:translateX(-50%);border-radius:1px}
+.tk.hn{background:rgba(200,168,75,0.5);height:14px;top:-4px}
+
+/* controls */
+#pbr{display:flex;align-items:center;justify-content:center;gap:10px}
+.pb2{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.08);
+  border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;
+  font-size:17px;cursor:pointer;transition:all .15s;flex-shrink:0;user-select:none}
+.pb2:active{transform:scale(0.9);background:rgba(255,255,255,0.15)}
+#plb{background:var(--gold);border-color:var(--gold);font-size:22px;width:56px;height:56px;
+  box-shadow:0 0 20px rgba(200,168,75,0.35)}
+#plb:active{background:var(--gl)}
+#spd{font-size:12px;font-weight:800;color:var(--gold);min-width:36px;text-align:center;
+  cursor:pointer;padding:4px;user-select:none;border-radius:var(--r)}
+#spd:active{background:rgba(200,168,75,0.1)}
+#cnt{font-size:10px;color:var(--mu);font-weight:600;text-align:center;min-width:48px}
+
+/* ── ROUND SUMMARY ── */
+#sum{position:absolute;inset:0;z-index:50;background:rgba(2,6,3,0.97);
+  display:none;flex-direction:column;overflow-y:auto;padding:52px 20px 40px;
+  -webkit-overflow-scrolling:touch}
+#sum.on{display:flex;animation:fi .25s ease}
+#sum::-webkit-scrollbar{display:none}
+@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+#sum-back{display:flex;align-items:center;gap:10px;margin-bottom:20px;cursor:pointer}
+#sum-back-arrow{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.08);
+  border:1px solid var(--brd);display:flex;align-items:center;justify-content:center;font-size:16px}
+#sum-title-block{flex:1}
+#sumtit{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;color:var(--gl);line-height:1}
+#sumsub{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--mu);margin-top:3px}
+.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.sst{background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:var(--r);padding:12px 6px;text-align:center}
+.sstv{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--gl)}
+.sstl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--mu);margin-top:3px}
+.hr{display:flex;align-items:flex-start;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.hr:last-child{border-bottom:none}
+.hnn{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;color:var(--gold);width:24px;flex-shrink:0;padding-top:1px}
+.hsh{flex:1;display:flex;gap:3px;flex-wrap:wrap}
+.sp2{font-size:9px;font-weight:600;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,0.06)}
+.hsc{font-size:11px;font-weight:800;width:24px;text-align:right;flex-shrink:0;padding-top:2px}
+.e2{color:#e84c3d}.b2{color:#ff9070}.p2{color:var(--white)}.g2{color:#4ca8e8}.d2{color:#80aaff}
+
+/* ── LOAD MODAL ── */
+#lm{position:absolute;inset:0;z-index:60;background:rgba(2,5,3,0.99);
+  display:flex;flex-direction:column;padding:52px 20px 40px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+#lm::-webkit-scrollbar{display:none}
+#lmlo{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;color:var(--gl);letter-spacing:2px}
+#lmsub{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--mu);margin-top:4px;margin-bottom:24px}
+.lmsec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--mu);margin-bottom:10px;font-weight:600}
+.rc{background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:16px;
+  padding:15px 17px;margin-bottom:9px;cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:12px}
+.rc:active{transform:scale(0.98);border-color:var(--gold);background:rgba(200,168,75,0.07)}
+.rci{width:44px;height:44px;border-radius:var(--r);background:#102014;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.rci2{flex:1;min-width:0}
+.rcn{font-size:13px;font-weight:700}
+.rcm{font-size:10px;color:var(--mu);margin-top:2px}
+.rcs{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;color:var(--gold);text-align:right;flex-shrink:0}
+.rcs span{display:block;font-family:'Outfit',sans-serif;font-size:7px;color:var(--mu);letter-spacing:1px}
+.lmor{text-align:center;font-size:10px;color:var(--mu);margin:14px 0}
+#lmcus{width:100%;padding:14px;border-radius:var(--r);border:1px solid var(--brd);
+  background:rgba(255,255,255,0.04);color:var(--white);font-family:'Outfit',sans-serif;
+  font-size:13px;font-weight:600;cursor:pointer;transition:all .18s}
+#lmcus:active{background:rgba(255,255,255,0.1)}
+
+/* ── HISTORY CARDS ── */
+.hrc{background:rgba(255,255,255,0.04);border:1px solid var(--brd);border-radius:16px;
+  padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;
+  transition:all .18s;cursor:pointer;position:relative}
+.hrc:active{transform:scale(.98);border-color:var(--gold)}
+.hrc-icon{width:40px;height:40px;border-radius:var(--r);background:rgba(200,168,75,0.12);
+  border:1px solid rgba(200,168,75,0.2);display:flex;align-items:center;justify-content:center;
+  font-size:17px;flex-shrink:0}
+.hrc-info{flex:1;min-width:0}
+.hrc-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrc-meta{font-size:10px;color:var(--mu);margin-top:2px}
+.hrc-badge{font-size:8px;font-weight:700;padding:2px 6px;border-radius:6px;
+  background:rgba(200,168,75,0.15);border:1px solid rgba(200,168,75,0.3);
+  color:var(--gold);margin-top:3px;display:inline-block;letter-spacing:.5px}
+.hrc-score{font-family:'Playfair Display',serif;font-size:18px;font-weight:900;
+  color:var(--gold);text-align:right;flex-shrink:0}
+.hrc-score span{display:block;font-family:'Outfit',sans-serif;font-size:7px;
+  color:var(--mu);letter-spacing:1px}
+.hrc-del{width:30px;height:30px;border-radius:50%;background:rgba(232,76,61,0.1);
+  border:1px solid rgba(232,76,61,0.25);display:flex;align-items:center;
+  justify-content:center;font-size:13px;cursor:pointer;flex-shrink:0;
+  transition:all .15s;color:#ff9080}
+.hrc-del:active{background:rgba(232,76,61,0.25);transform:scale(.9)}
+#del-confirm{display:none}
+#del-confirm.show{display:flex}
+
+/* ── TOAST ── */
+#toast{position:absolute;bottom:260px;left:50%;transform:translateX(-50%) translateY(10px);
+  background:rgba(10,25,12,0.9);border:1px solid var(--brd);border-radius:20px;
+  padding:8px 18px;font-size:11px;font-weight:600;color:var(--white);
+  pointer-events:none;opacity:0;transition:all .3s;white-space:nowrap;z-index:30;
+  backdrop-filter:blur(12px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── HOLE TRANSITION ── */
+#hole-flash{position:absolute;inset:0;z-index:18;background:rgba(0,0,0,0);pointer-events:none;transition:background .3s}
+#hole-flash.flash{background:rgba(0,0,0,0.5)}
+</style>
+</head>
+<body>
+<div id="root">
+<canvas id="cv" width="390" height="844"></canvas>
+
+<div id="top">
+  <div class="ib" id="sum-btn" onclick="showSum()">📋</div>
+  <div id="tc"><div id="tt">LINKS · Round Replay</div><div id="ts">Choose a round below</div></div>
+  <div class="ib" id="vid-btn" onclick="startVideoExport()" title="Export video" style="display:none">🎬</div>
+  <div class="ib" id="cam-cycle-btn" onclick="cycleCam()" title="Switch camera">📷</div>
+</div>
+
+<div id="sc">
+  <div id="scl">Shot — of —</div>
+  <div id="sct">Select a round to begin</div>
+  <div id="scn"> </div>
+  <div id="scs">
+    <div class="ss"><div class="ssv" id="syds">—</div><div class="ssl">Yards</div></div>
+    <div class="ss"><div class="ssv" id="sclub">—</div><div class="ssl">Club</div></div>
+    <div class="ss"><div class="ssv" id="straj">—</div><div class="ssl">Flight</div></div>
+    <div class="ss"><div class="ssv" id="sholn">—</div><div class="ssl">Hole</div></div>
+  </div>
+  <div id="scp"><div id="scpf"></div></div>
+</div>
+
+<div id="cams">
+  <div class="cb on" data-c="aerial" onclick="setCam(this)">Aerial</div>
+  <div class="cb" data-c="behind" onclick="setCam(this)">Behind</div>
+  <div class="cb" data-c="side" onclick="setCam(this)">Side</div>
+  <div class="cb" data-c="hole" onclick="setCam(this)">Full Hole</div>
+</div>
+
+<div id="pb">
+  <div id="ss"></div>
+  <div id="pbl"><span id="pbl1">Tee</span><span id="pbr1">—</span></div>
+  <div id="pbb" id="pbb-bar">
+    <div id="pbf"></div>
+    <div id="pbt"></div>
+    <div id="pbtk"></div>
+  </div>
+  <div id="pbr">
+    <div class="pb2" onclick="prev()" title="Previous shot">⏮</div>
+    <div class="pb2" onclick="rew()" title="Restart shot">⏪</div>
+    <div class="pb2" id="plb" onclick="tog()">▶</div>
+    <div class="pb2" onclick="nxt()" title="Next shot">⏭</div>
+    <div id="spd" onclick="cyc()">1×</div>
+    <div id="cnt">— / —</div>
+  </div>
+</div>
+
+<!-- Round Summary -->
+<div id="sum">
+  <div id="sum-back" onclick="hideSum()">
+    <div id="sum-back-arrow">←</div>
+    <div id="sum-title-block">
+      <div id="sumtit">Round Summary</div>
+      <div id="sumsub">—</div>
+    </div>
+  </div>
+  <div class="sgrid" id="sg"></div>
+  <div id="sh"></div>
+</div>
+
+<!-- Load Modal -->
+<div id="lm">
+  <div id="lmlo">LINKS</div>
+  <div id="lmsub">Golf Round Simulator</div>
+
+  <!-- My Rounds (history from tracker) -->
+  <div id="my-rounds-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="lmsec" style="margin-bottom:0">My Rounds</div>
+      <button onclick="confirmClearAll()" style="background:rgba(232,76,61,0.12);border:1px solid rgba(232,76,61,0.25);
+        color:#ff9080;font-family:'Outfit',sans-serif;font-size:10px;font-weight:700;
+        padding:4px 10px;border-radius:8px;cursor:pointer;letter-spacing:.5px">
+        CLEAR ALL
+      </button>
+    </div>
+    <div id="history-list"></div>
+    <div class="lmor" style="margin:14px 0 10px">— or load a demo —</div>
+  </div>
+
+  <div class="lmsec" id="demo-label">Demo Rounds</div>
+  <div id="dl"></div>
+  <div class="lmor">— or —</div>
+  <button id="lmcus" onclick="loadCustom()">⛳ Simulate a Random Round</button>
+</div>
+
+<!-- History Delete Confirm -->
+<div id="del-confirm" style="display:none;position:absolute;inset:0;z-index:70;
+  background:rgba(0,0,0,0.82);display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px)">
+  <div style="background:#111d12;border:1px solid rgba(232,76,61,0.3);border-radius:22px;
+    padding:26px 22px;width:320px;text-align:center">
+    <div style="font-size:32px;margin-bottom:10px">🗑️</div>
+    <div id="del-title" style="font-family:'Playfair Display',serif;font-size:18px;
+      font-weight:900;color:#f0ede4;margin-bottom:6px">Delete this round?</div>
+    <div id="del-sub" style="font-size:12px;color:rgba(240,237,228,0.45);margin-bottom:20px"></div>
+    <button onclick="executeDelete()" style="width:100%;padding:14px;border-radius:12px;
+      background:#e84c3d;border:none;color:#fff;font-family:'Outfit',sans-serif;
+      font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+      cursor:pointer;margin-bottom:8px">Delete Round</button>
+    <button onclick="cancelDelete()" style="width:100%;padding:13px;border-radius:12px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+      color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
+      font-weight:600;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<!-- Video Export Progress -->
+<div id="vid-progress" style="display:none;position:absolute;inset:0;z-index:75;
+  background:rgba(0,0,0,0.88);align-items:center;justify-content:center;
+  backdrop-filter:blur(10px)">
+  <div style="background:#111d12;border:1px solid rgba(200,168,75,0.3);border-radius:24px;
+    padding:28px 22px;width:330px;text-align:center">
+    <div style="font-size:40px;margin-bottom:10px" id="vid-icon">🎬</div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:900;
+      color:#e8ca6e;margin-bottom:6px" id="vid-status">Recording replay…</div>
+    <div style="font-size:12px;color:rgba(240,237,228,0.45);margin-bottom:16px" id="vid-sub">
+      Playing through all shots at 2× speed</div>
+    <div style="background:rgba(255,255,255,0.08);border-radius:4px;height:4px;overflow:hidden;margin-bottom:18px">
+      <div id="vid-bar" style="height:100%;background:linear-gradient(90deg,#c8a84b,#e8ca6e);
+        border-radius:4px;width:0%;transition:width .2s linear"></div>
+    </div>
+    <button id="vid-cancel-btn" onclick="cancelVideoExport()"
+      style="width:100%;padding:13px;border-radius:12px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
+      color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
+      font-weight:600;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="hole-flash"></div>
+
+<script>
+// ════════════════════════════════════════
+// ROUND DATA
+// ════════════════════════════════════════
+const ROUNDS=[
+{id:'r1',courseName:'Augusta National GC',date:'May 2025',totalPar:36,score:38,terrain:'pines',
+ holes:[
+  {n:1,par:4,yds:445,name:'Tea Olive',dogleg:'right',water:false,
+   shots:[{club:'D',type:'line',yds:265,note:'Solid tee shot, slight fade'},{club:'7i',type:'high',yds:148,note:'Approach to right of pin'},{putts:2}]},
+  {n:2,par:5,yds:575,name:'Pink Dogwood',dogleg:'left',water:false,
+   shots:[{club:'D',type:'high',yds:278,note:'Big drive down the left'},{club:'3W',type:'line',yds:215,note:'Layup short of bunker'},{club:'SW',type:'high',yds:82,note:'Wedge in close'},{putts:1}]},
+  {n:3,par:4,yds:350,name:'Flowering Peach',dogleg:'none',water:false,
+   shots:[{club:'5i',type:'line',yds:175,note:'Iron off tee, tight driving hole'},{club:'PW',type:'high',yds:105,note:'Short approach, pin high'},{putts:2}]},
+  {n:4,par:3,yds:240,name:'Crab Apple',dogleg:'none',water:false,
+   shots:[{club:'4i',type:'high',yds:195,note:'Long par 3, downhill'},{putts:3}]},
+  {n:5,par:4,yds:495,name:'Magnolia',dogleg:'right',water:false,
+   shots:[{club:'D',type:'line',yds:285,note:'Driver, slight draw'},{club:'5i',type:'high',yds:170,note:'Uphill into the green'},{putts:2}]},
+  {n:6,par:3,yds:180,name:'Juniper',dogleg:'none',water:false,
+   shots:[{club:'6i',type:'high',yds:162,note:'Hit the green, short right'},{putts:2}]},
+  {n:7,par:4,yds:450,name:'Pampas',dogleg:'none',water:false,
+   shots:[{club:'D',type:'high',yds:258,note:'Tee shot into right rough'},{club:'6i',type:'low',yds:155,note:'Punch from rough'},{club:'SW',type:'high',yds:72,note:'Chip to green'},{putts:2}]},
+  {n:8,par:5,yds:570,name:'Yellow Jasmine',dogleg:'left',water:true,
+   shots:[{club:'D',type:'line',yds:290,note:'Best drive, hugs the left'},{club:'4i',type:'line',yds:185,note:'Long iron, just short'},{club:'LW',type:'high',yds:60,note:'Flop shot over bunker'},{putts:2}]},
+  {n:9,par:4,yds:460,name:'Carolina Cherry',dogleg:'right',water:false,
+   shots:[{club:'D',type:'line',yds:268,note:'Tee shot right center'},{club:'6i',type:'high',yds:158,note:'Approach misses left'},{club:'GW',type:'ground',yds:25,note:'Bump and run from fringe'},{putts:1}]},
+ ]},
+{id:'r2',courseName:'Pebble Beach GL',date:'Apr 2025',totalPar:36,score:42,terrain:'coastal',
+ holes:[
+  {n:1,par:4,yds:381,name:'Hole 1',dogleg:'none',water:false,shots:[{club:'3W',type:'line',yds:208,note:'Cautious off the tee'},{club:'8i',type:'high',yds:130,note:'Short approach'},{putts:2}]},
+  {n:2,par:5,yds:502,name:'Hole 2',dogleg:'right',water:false,shots:[{club:'D',type:'high',yds:245,note:'Drive'},{club:'5i',type:'line',yds:165,note:'Lay up'},{club:'PW',type:'high',yds:90,note:'Wedge on'},{putts:2}]},
+  {n:3,par:4,yds:390,name:'Hole 3',dogleg:'none',water:true,shots:[{club:'D',type:'line',yds:240,note:'Solid drive'},{club:'7i',type:'high',yds:138,note:'Approach over cove'},{putts:3}]},
+  {n:4,par:4,yds:331,name:'Hole 4',dogleg:'left',water:false,shots:[{club:'5W',type:'line',yds:195,note:'Lay up'},{club:'SW',type:'high',yds:88,note:'Wedge close'},{putts:1}]},
+  {n:5,par:3,yds:195,name:'Hole 5',dogleg:'none',water:true,shots:[{club:'5i',type:'high',yds:170,note:'Par 3, ocean right'},{putts:2}]},
+  {n:6,par:5,yds:523,name:'Hole 6',dogleg:'right',water:true,shots:[{club:'D',type:'high',yds:250,note:'Drive left away from cliffs'},{club:'5W',type:'line',yds:193,note:'Fairway wood'},{club:'9i',type:'high',yds:112,note:'Into green'},{putts:2}]},
+  {n:7,par:3,yds:107,name:'Hole 7',dogleg:'none',water:true,shots:[{club:'9i',type:'high',yds:100,note:'Iconic short par 3 over ocean'},{putts:3}]},
+  {n:8,par:4,yds:431,name:'Hole 8',dogleg:'right',water:true,shots:[{club:'D',type:'line',yds:260,note:'Blind drive over cliffside'},{club:'7i',type:'high',yds:142,note:'Ocean view approach'},{putts:2}]},
+  {n:9,par:4,yds:481,name:'Hole 9',dogleg:'none',water:false,shots:[{club:'D',type:'high',yds:268,note:'Uphill drive'},{club:'5i',type:'line',yds:160,note:'Long iron'},{club:'SW',type:'high',yds:53,note:'Sand save'},{putts:2}]},
+ ]}
+];
+
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const W=390,H=844;
+const cv=document.getElementById('cv');
+const cx=cv.getContext('2d');
+let round=null,flat=[],si=0,prog=0,playing=false,cam='aerial';
+let lastT=null,spI=1,geomCache={};
+const SPEEDS=[0.25,0.5,1,1.5,2];
+const DUR=3200;
+const CAMS=['aerial','behind','side','hole'];
+const CLUBS={D:'Driver','3W':'3 Wood','5W':'5 Wood','3H':'3 Hybrid','4i':'4 Iron','5i':'5 Iron','6i':'6 Iron','7i':'7 Iron','8i':'8 Iron','9i':'9 Iron',PW:'Pitching Wedge',GW:'Gap Wedge',SW:'Sand Wedge',LW:'Lob Wedge',PT:'Putter'};
+const TCOLS={high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b',putt:'#b0c890'};
+function tcol(s){return TCOLS[s.type]||'#eee';}
+
+// ════════════════════════════════════════
+// FLATTEN
+// ════════════════════════════════════════
+function flatten(r){
+  const f=[];
+  r.holes.forEach(h=>{
+    const app=h.shots.filter(s=>!('putts' in s));
+    const pt=h.shots.find(s=>'putts' in s);
+    let cumFrac=0; // cumulative hole fraction consumed so far
+    app.forEach((s,i)=>{
+      const shotFrac=s.yds/h.yds; // fraction of hole this shot covers
+      f.push({...s,hN:h.n,hPar:h.par,hYds:h.yds,hName:h.name,
+        hDog:h.dogleg||'none',hWater:!!h.water,sIn:i+1,isPutt:false,
+        _startFrac:cumFrac,  // where on the hole this shot starts (0=tee,1=pin)
+        _endFrac:Math.min(1,cumFrac+shotFrac),
+        _lat:((i*13+h.n*7+(r.id.charCodeAt?r.id.charCodeAt(0):1))%21-10)/10});
+      cumFrac=Math.min(1,cumFrac+shotFrac);
+    });
+    if(pt) for(let p=0;p<pt.putts;p++) f.push({
+      club:'PT',type:'putt',yds:Math.max(3,10-p*3),note:`Putt ${p+1}`,
+      hN:h.n,hPar:h.par,hYds:h.yds,hName:h.name,hDog:'none',hWater:false,
+      sIn:app.length+p+1,isPutt:true,
+      _startFrac:Math.min(1,cumFrac+p*0.01), // putts are near the pin
+      _endFrac:Math.min(1,cumFrac+(p+1)*0.01),
+      _lat:(p===0?0.05:-0.05)});
+  });
+  return f;
+}
+
+// ════════════════════════════════════════
+// BALL PHYSICS — 3D parabolic
+// ════════════════════════════════════════
+function b3(t,s){
+  const ah={high:0.48,line:0.20,low:0.09,ground:0.035,putt:0.01}[s.type]||0.18;
+  return{
+    x:(s._lat||0)*s.yds*0.05*Math.sin(Math.PI*t),
+    y:t*s.yds,
+    z:s.yds*ah*Math.sin(Math.PI*t)
+  };
+}
+
+// ════════════════════════════════════════
+// GEOMETRY — aerial bezier is the source of truth for ALL views
+// ════════════════════════════════════════
+function mkGeom(hN,hYds,dogleg,water,terrain){
+  const key=`${hN}`;
+  if(geomCache[key]) return geomCache[key];
+  const r=n=>(((hN*6271+n*1664525+1013904223)^(n*22695477+hN*31337))&0x7fffffff)/0x7fffffff;
+
+  // ── Aerial fairway shape (bezier) ──
+  // This is the canonical shape — all other views derive from it
+  const teeX=W/2, teeY=H-55;
+  const pinX=135+r(1)*120, pinY=80+r(2)*75;
+  const wTee=80+r(3)*30, wGreen=40+r(4)*22;
+
+  // Dogleg: bend the control points
+  const dogBend={right:1,left:-1,none:0}[dogleg]||0;
+  const bendAmt=30+r(5)*40;
+  const lCtrl1={x:teeX-wTee/2-10+dogBend*(-bendAmt)*0.3,  y:H-210-r(6)*120};
+  const lCtrl2={x:pinX-wGreen/2-10+dogBend*bendAmt*0.5,   y:pinY+170+r(7)*80};
+  const rCtrl1={x:teeX+wTee/2+10+dogBend*(-bendAmt)*0.15, y:H-210-r(8)*120};
+  const rCtrl2={x:pinX+wGreen/2+10+dogBend*bendAmt*0.3,   y:pinY+170+r(9)*80};
+
+  // Precompute bezier sample points (N=40 for smooth shape)
+  const N=40;
+  const lPts=[],rPts=[],cPts=[];
+  for(let i=0;i<=N;i++){
+    const t2=i/N;
+    const lx=bp(teeX-wTee/2,lCtrl1.x,lCtrl2.x,pinX-wGreen/2,t2);
+    const ly=bp(teeY,lCtrl1.y,lCtrl2.y,pinY,t2);
+    const rx=bp(teeX+wTee/2,rCtrl1.x,rCtrl2.x,pinX+wGreen/2,t2);
+    const ry=bp(teeY,rCtrl1.y,rCtrl2.y,pinY,t2);
+    lPts.push({x:lx,y:ly});rPts.push({x:rx,y:ry});
+    cPts.push({x:(lx+rx)/2,y:(ly+ry)/2,w:rx-lx});
+  }
+
+  // Fairway width profile at fractional position
+  function fwAt(frac){
+    const idx=Math.min(N-1,Math.floor(frac*N));
+    return cPts[idx]||cPts[N];
+  }
+
+  // Features placed relative to fairway
+  const bunkers=Array.from({length:3+Math.floor(r(40)*4)},(_,i)=>{
+    const frac=0.15+r(50+i*5)*0.72;
+    const c=fwAt(frac);
+    const side=r(51+i*5)>0.5?1:-1;
+    const offset=(c.w/2)*(0.45+r(52+i*5)*0.55);
+    return{x:c.x+side*offset,y:c.y,rx:13+r(53+i*5)*22,ry:8+r(54+i*5)*13,rot:r(55+i*5)*1.4-0.7,frac};
+  });
+
+  const water2=water?{
+    frac:0.35+r(60)*0.35,
+    side:r(61)>0.5?1:-1,
+    rx:50+r(62)*70,ry:20+r(63)*35,rot:r(64)*0.8-0.4
+  }:null;
+  if(water2){
+    const c=fwAt(water2.frac);
+    water2.x=c.x+water2.side*(c.w/2+water2.rx*0.5);
+    water2.y=c.y;
+  }
+
+  const treesL=Array.from({length:7+Math.floor(r(70)*5)},(_,i)=>({
+    x:8+r(80+i*2)*52,y:70+r(81+i*2)*(H-160),h:65+r(82+i*2)*130,w:16+r(83+i*2)*18}));
+  const treesR=Array.from({length:7+Math.floor(r(70)*5)},(_,i)=>({
+    x:W-8-r(90+i*2)*52,y:70+r(91+i*2)*(H-160),h:65+r(92+i*2)*130,w:16+r(93+i*2)*18}));
+
+  const elevation=Array.from({length:14},(_,i)=>({
+    t:i/13,e:(r(110+i)*0.5-0.25)+(dogBend*0.04*i/6)}));
+
+  const isCoastal=terrain==='coastal';
+  const cliff=isCoastal&&r(120)>0.25?{frac:0.3+r(121)*0.4,height:45+r(122)*80}:null;
+  if(cliff){const c=fwAt(cliff.frac);cliff.x=c.x;cliff.y=c.y;}
+
+  const g={
+    teeX,teeY,pinX,pinY,wTee,wGreen,
+    lPts,rPts,cPts,N,fwAt,
+    lCtrl1,lCtrl2,rCtrl1,rCtrl2,
+    bunkers,water:water2,treesL,treesR,elevation,cliff,
+    greenTilt:r(130)*0.35-0.17,greenElong:0.85+r(131)*0.55,
+    fringeRx:46+r(132)*22,fringeRy:32+r(133)*18,
+    mowSeed:r(134)*100,terrain
+  };
+  geomCache[key]=g;
+  return g;
+}
+function bp(p0,p1,p2,p3,t){
+  return (1-t)**3*p0+3*(1-t)**2*t*p1+3*(1-t)*t**2*p2+t**3*p3;
+}
+
+// ════════════════════════════════════════
+// VIEWPORT — camera positioned at ball's lie, looking to pin
+// The aerial coordinate system is the full hole (teeY → pinY).
+// We compute a canvas transform so the ball's start position sits
+// at the bottom of the screen and the pin fills the top,
+// showing only what is physically ahead of the player.
+// ════════════════════════════════════════
+
+// ballStartFrac: how far along the hole the shot originates (0=tee,1=pin)
+// For tee shots it's 0; for approach it's wherever the drive landed.
+// We track this on each flat shot when we flatten the round.
+
+function getViewport(s, g) {
+  // Where on the hole does this shot START (the ball's lie)?
+  const startFrac = s._startFrac !== undefined ? s._startFrac : 0;
+  // Where does it END?
+  const endFrac   = Math.min(1, startFrac + s.yds / s.hYds);
+
+  // The visible window: from ball lie to the pin (frac 1.0).
+  // We always show at least to the pin. Never show behind the ball.
+  const visStart = startFrac;        // bottom of screen
+  const visEnd   = 1.0;              // top of screen (pin always visible)
+  const visRange = Math.max(0.05, visEnd - visStart);
+
+  // Aerial screen coordinates for the start and end of the window
+  const botCenter = g.fwAt(visStart);  // screen pos of ball lie
+  const topCenter = g.fwAt(visEnd);    // screen pos of pin
+
+  // We want botCenter.y → H (bottom of canvas)
+  //        topCenter.y → topMargin (top of canvas)
+  const topMargin = 90;   // leave room for the top HUD
+  const botMargin = H - 40;
+
+  const screenSpan = botMargin - topMargin;
+  const aerialSpan = botCenter.y - topCenter.y; // pixels in aerial coords (positive, tee is lower)
+
+  // Scale: how many aerial pixels fit in screenSpan
+  const scale = aerialSpan > 0 ? screenSpan / aerialSpan : 1;
+
+  // Translation: shift so botCenter.y maps to botMargin
+  const tx = W / 2 - botCenter.x * scale;   // horizontal centering on fairway midpoint
+  const ty = botMargin - botCenter.y * scale;
+
+  return { scale, tx, ty, visStart, visEnd, visRange, botCenter, topCenter };
+}
+
+// Apply canvas viewport transform for aerial-derived views.
+// Returns { scale, tx, ty } so callers can inverse-transform if needed.
+function pushViewport(vp) {
+  cx.save();
+  cx.transform(vp.scale, 0, 0, vp.scale, vp.tx, vp.ty);
+}
+function popViewport() {
+  cx.restore();
+}
+
+// PROJECT — aerial is ground truth; others derived
+
+// Aerial: maps world position through the viewport
+function pAerial(p3, s, g) {
+  const { x, y, z } = p3, d = Math.max(s.yds, 40);
+  const frac = y / d;
+  // Shot travels from startFrac to startFrac + shot/holeYds
+  const holeFrac = (s._startFrac || 0) + frac * (s.yds / s.hYds);
+  const c = g.fwAt(Math.min(holeFrac, 1));
+  // Lateral spread shrinks as ball approaches pin
+  const lateralSpread = 2.8 - holeFrac * 1.8;
+  const aerialX = c.x + x * lateralSpread;
+  const aerialY = g.teeY + holeFrac * (g.pinY - g.teeY) - z * 0.35;
+  return { x: aerialX, y: aerialY };  // in full-hole aerial space; viewport applied by caller
+}
+
+// Behind: perspective derived from aerial lane, camera at ball lie
+function pBehind(p3,s,g){
+  const{x,y,z}=p3,d=Math.max(s.yds,40);
+  const shotFrac=Math.min(y/d,1);
+  const holeFrac=Math.min(1,(s._startFrac||0)+shotFrac*(s.yds/s.hYds));
+  // Camera is always at the ball's starting lie, looking toward pin
+  const camHoleFrac=s._startFrac||0;
+  const camC=g.fwAt(camHoleFrac);
+  const pinC=g.fwAt(1);
+  // World distance from camera
+  const worldDist=shotFrac*s.yds+8;
+  const fov=0.82;
+  const sc=(W*0.44)/(worldDist*fov+1);
+  // Lateral: offset from fairway center at current holeFrac
+  const curC=g.fwAt(holeFrac);
+  const vanishX=pinC.x*(1-camHoleFrac)+camC.x*camHoleFrac; // interpolate toward pin
+  const screenX=vanishX+(x+(curC.x-camC.x)*0.12)*sc;
+  const screenY=H*0.67-z*sc-worldDist*fov*0.062*sc;
+  return{x:screenX,y:screenY};
+}
+
+// Side: left=ball lie, right=pin; shows only the shot's range
+function pSide(p3,s,g){
+  const{y,z}=p3,d=Math.max(s.yds,40);
+  const shotFrac=y/d;
+  const holeFrac=Math.min(1,(s._startFrac||0)+shotFrac*(s.yds/s.hYds));
+  // Elevation at this position
+  const elevPts=g.elevation;
+  const eIdx=Math.min(elevPts.length-2,Math.floor(holeFrac*(elevPts.length-1)));
+  const ef=holeFrac*(elevPts.length-1)-eIdx;
+  const eVal=elevPts[eIdx].e*(1-ef)+elevPts[Math.min(eIdx+1,elevPts.length-1)].e*ef;
+  const groundY=H*0.68-eVal*(H*0.08);
+  // x maps from ball lie (left edge) to pin (right edge)
+  // leftmost=startFrac, rightmost=1.0 (pin)
+  const startFrac=s._startFrac||0;
+  const visRange=Math.max(0.05,1-startFrac);
+  const relFrac=(holeFrac-startFrac)/visRange;  // 0 at ball, 1 at pin
+  const screenX=30+relFrac*(W-76);
+  const screenY=groundY-z*(H*0.45/d*0.82);
+  return{x:screenX,y:screenY,groundY,holeFrac};
+}
+
+// ════════════════════════════════════════
+// COLOUR THEMES
+// ════════════════════════════════════════
+function theme(t){
+  const themes={
+    pines:{sky1:'#040c06',sky2:'#091808',sky3:'#0d2010',
+      rough1:'#142614',rough2:'#0c1a0d',
+      fair1:'#1a4e1e',fair2:'#226024',fair3:'#2a7a2e',
+      green1:'#24a028',green2:'#1c8822',green3:'#2cb832',
+      sand1:'#c8a44e',sand2:'#a88430',
+      tree1:'#081808',tree2:'#0c2010',tree3:'#102814',
+      water1:'#082028',water2:'#0a3050',water3:'rgba(18,70,110,0.7)',
+      horizon:'#0e2610'},
+    coastal:{sky1:'#050c12',sky2:'#0a1822',sky3:'#0e2032',
+      rough1:'#142216',rough2:'#0c1810',
+      fair1:'#184e1c',fair2:'#1e5e22',fair3:'#247028',
+      green1:'#1e9824',green2:'#188020',green3:'#24a82a',
+      sand1:'#d4b462',sand2:'#b49040',
+      tree1:'#0a1a0c',tree2:'#0c2010',tree3:'#0e2614',
+      water1:'#06182a',water2:'#0a2840',water3:'rgba(14,56,96,0.78)',
+      horizon:'#102030'}
+  };
+  return themes[t]||themes.pines;
+}
+
+// ════════════════════════════════════════
+// NOISE
+// ════════════════════════════════════════
+function n2(x,y,s){const h=Math.sin(x*127.1+y*311.7+s)*43758.5453;return h-Math.floor(h);}
+function fbm(x,y,s){return n2(x,y,s)*0.5+n2(x*2.1,y*2.1,s+7)*0.25+n2(x*4.3,y*4.3,s+13)*0.125;}
+
+// ════════════════════════════════════════
+// SHARED DRAWERS (used by multiple views)
+// ════════════════════════════════════════
+function drawBunkersAerial(g,th){
+  g.bunkers.forEach(b=>{
+    cx.save();cx.translate(b.x,b.y);cx.rotate(b.rot||0);
+    const bg=cx.createRadialGradient(-b.rx*.2,-b.ry*.2,0,0,0,Math.max(b.rx,b.ry));
+    bg.addColorStop(0,th.sand1);bg.addColorStop(.8,th.sand2);bg.addColorStop(1,'rgba(140,100,40,.2)');
+    cx.fillStyle=bg;cx.beginPath();cx.ellipse(0,0,b.rx,b.ry,0,0,Math.PI*2);cx.fill();
+    cx.strokeStyle='rgba(90,60,15,.45)';cx.lineWidth=1.5;cx.stroke();
+    cx.restore();
+  });
+}
+function drawWaterAerial(g,th){
+  if(!g.water) return;
+  const w=g.water;
+  cx.save();cx.translate(w.x,w.y);cx.rotate(w.rot||0);
+  const wg=cx.createRadialGradient(-w.rx*.2,-w.ry*.2,0,0,0,Math.max(w.rx,w.ry));
+  wg.addColorStop(0,th.water2);wg.addColorStop(.7,th.water1);wg.addColorStop(1,'rgba(4,10,18,.3)');
+  cx.fillStyle=wg;cx.beginPath();cx.ellipse(0,0,w.rx,w.ry,0,0,Math.PI*2);cx.fill();
+  cx.fillStyle=th.water3;cx.beginPath();cx.ellipse(-w.rx*.1,-w.ry*.2,w.rx*.5,w.ry*.22,0,0,Math.PI*2);cx.fill();
+  cx.strokeStyle='rgba(16,72,128,.35)';cx.lineWidth=1.5;cx.beginPath();cx.ellipse(0,0,w.rx,w.ry,0,0,Math.PI*2);cx.stroke();
+  cx.restore();
+}
+function drawGreenAerial(g,th){
+  const{pinX,pinY}=g;
+  cx.fillStyle=th.fair3;
+  cx.beginPath();cx.ellipse(pinX,pinY,g.fringeRx+14,g.fringeRy+10,g.greenTilt,0,Math.PI*2);cx.fill();
+  const grg=cx.createRadialGradient(pinX-8,pinY-8,0,pinX,pinY,g.fringeRx*1.1);
+  grg.addColorStop(0,th.green1);grg.addColorStop(.7,th.green2);grg.addColorStop(1,th.green3);
+  cx.fillStyle=grg;cx.beginPath();cx.ellipse(pinX,pinY,g.fringeRx,g.fringeRy,g.greenTilt,0,Math.PI*2);cx.fill();
+  cx.strokeStyle='rgba(255,255,255,.055)';cx.lineWidth=1;
+  [.5,.75,.95].forEach(f=>{cx.beginPath();cx.ellipse(pinX,pinY,g.fringeRx*f,g.fringeRy*f,g.greenTilt,0,Math.PI*2);cx.stroke();});
+  cx.fillStyle='rgba(0,0,0,.55)';cx.beginPath();cx.arc(pinX,pinY,3,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#cc1111';cx.fillRect(pinX,pinY-15,1.5,15);
+  cx.fillStyle='#ff4422';cx.beginPath();cx.moveTo(pinX+1.5,pinY-15);cx.lineTo(pinX+11,pinY-10);cx.lineTo(pinX+1.5,pinY-5);cx.fill();
+}
+function drawTreeCanopy(g,th){
+  [...g.treesL,...g.treesR].forEach(tr=>{
+    const cr=tr.w*.88;
+    const cg=cx.createRadialGradient(tr.x-cr*.2,tr.y-cr*.2,0,tr.x,tr.y,cr);
+    cg.addColorStop(0,th.tree3);cg.addColorStop(.6,th.tree2);cg.addColorStop(1,th.tree1);
+    cx.fillStyle=cg;cx.beginPath();cx.arc(tr.x,tr.y,cr,0,Math.PI*2);cx.fill();
+    cx.fillStyle='rgba(0,0,0,.2)';cx.beginPath();cx.ellipse(tr.x+4,tr.y+4,cr,cr*.55,.35,0,Math.PI*2);cx.fill();
+  });
+}
+
+// ════════════════════════════════════════
+// AERIAL VIEW — viewport-relative: camera at ball lie, pin at top
+// ════════════════════════════════════════
+function drawAerial(t,s,g,th){
+  const vp=getViewport(s,g);
+
+  // 1. Fill entire canvas with rough background first (outside transform)
+  const bg=cx.createRadialGradient(W/2,H/2,0,W/2,H/2,490);
+  bg.addColorStop(0,th.rough1);bg.addColorStop(1,th.rough2);
+  cx.fillStyle=bg;cx.fillRect(0,0,W,H);
+
+  // 2. Apply viewport transform — everything below here is in full-hole aerial coords
+  pushViewport(vp);
+
+  // Terrain noise (drawn in world space)
+  const noiseStep=Math.ceil(5/vp.scale);// adapt to zoom
+  for(let y=g.pinY-20;y<=g.teeY+20;y+=noiseStep){
+    for(let x=0;x<W;x+=noiseStep){
+      const n=fbm(x/W*5,y/H*7,g.mowSeed);
+      if(n>.58){cx.fillStyle=`rgba(255,255,255,${(n-.58)*.06})`;cx.fillRect(x,y,noiseStep,noiseStep);}
+      if(n<.28){cx.fillStyle=`rgba(0,0,0,${(.28-n)*.08})`;cx.fillRect(x,y,noiseStep,noiseStep);}
+    }
+  }
+
+  // Water (only if within visible window)
+  if(g.water){
+    const wf=g.water.frac;
+    if(wf>=vp.visStart-0.05) drawWaterAerial(g,th);
+  }
+
+  // Fairway shape (full bezier — clipping handles what's shown)
+  const{lPts,rPts,N}=g;
+  cx.beginPath();cx.moveTo(lPts[0].x,lPts[0].y);
+  lPts.forEach(p=>cx.lineTo(p.x,p.y));
+  rPts.slice().reverse().forEach(p=>cx.lineTo(p.x,p.y));
+  cx.closePath();
+  const fwg=cx.createLinearGradient(W/2,g.teeY,W/2,g.pinY);
+  fwg.addColorStop(0,th.fair1);fwg.addColorStop(.5,th.fair2);fwg.addColorStop(1,th.fair3);
+  cx.fillStyle=fwg;cx.fill();
+
+  // Mowing stripes clipped to fairway
+  cx.save();
+  cx.beginPath();cx.moveTo(lPts[0].x,lPts[0].y);
+  lPts.forEach(p=>cx.lineTo(p.x,p.y));rPts.slice().reverse().forEach(p=>cx.lineTo(p.x,p.y));
+  cx.closePath();cx.clip();
+  for(let i=0;i<N;i+=2){
+    const l=lPts[i],ln=lPts[i+1]||lPts[i],r=rPts[i],rn=rPts[i+1]||rPts[i];
+    cx.beginPath();cx.moveTo(l.x,l.y);cx.lineTo(ln.x,ln.y);cx.lineTo(rn.x,rn.y);cx.lineTo(r.x,r.y);
+    cx.closePath();cx.fillStyle='rgba(255,255,255,.022)';cx.fill();
+  }
+  cx.restore();
+
+  // Bunkers — only those within visible window (ahead of ball)
+  g.bunkers.forEach(b=>{
+    if(b.frac<vp.visStart-0.04) return; // behind ball: skip
+    cx.save();cx.translate(b.x,b.y);cx.rotate(b.rot||0);
+    const bg2=cx.createRadialGradient(-b.rx*.2,-b.ry*.2,0,0,0,Math.max(b.rx,b.ry));
+    bg2.addColorStop(0,th.sand1);bg2.addColorStop(.8,th.sand2);bg2.addColorStop(1,'rgba(140,100,40,.2)');
+    cx.fillStyle=bg2;cx.beginPath();cx.ellipse(0,0,b.rx,b.ry,0,0,Math.PI*2);cx.fill();
+    cx.strokeStyle='rgba(90,60,15,.45)';cx.lineWidth=1.5/vp.scale;cx.stroke();
+    cx.restore();
+  });
+
+  // Green + fringe
+  drawGreenAerial(g,th);
+
+  // Trees as canopy — all of them (they line both sides of the whole hole)
+  drawTreeCanopy(g,th);
+
+  // Ball lie marker (where this shot starts)
+  {
+    const ballLieC=g.fwAt(vp.visStart);
+    cx.strokeStyle='rgba(200,168,75,.65)';cx.lineWidth=1.5/vp.scale;
+    cx.beginPath();cx.arc(ballLieC.x,ballLieC.y,8/vp.scale,0,Math.PI*2);cx.stroke();
+    cx.fillStyle='rgba(200,168,75,.2)';cx.fill();
+    // "YOU ARE HERE" label
+    cx.fillStyle='rgba(200,168,75,.7)';cx.font=`${9/vp.scale}px Outfit`;cx.textAlign='center';
+    cx.fillText('●',ballLieC.x,ballLieC.y+3/vp.scale);cx.textAlign='left';
+  }
+
+  // Yardage rings: 50y, 100y, 150y ahead of ball (if within shot range)
+  [50,100,150].forEach(aheadYds=>{
+    if(aheadYds>s.yds+10) return;// beyond landing, skip
+    const frac=vp.visStart+aheadYds/s.hYds;
+    if(frac>1) return;
+    const c=g.fwAt(frac);
+    cx.strokeStyle='rgba(200,168,75,.18)';cx.lineWidth=1/vp.scale;cx.setLineDash([4/vp.scale,6/vp.scale]);
+    cx.beginPath();cx.arc(c.x,c.y,14/vp.scale,0,Math.PI*2);cx.stroke();cx.setLineDash([]);
+    cx.fillStyle='rgba(200,168,75,.38)';cx.font=`${8/vp.scale}px Outfit`;cx.textAlign='center';
+    cx.fillText(aheadYds+'y',c.x,c.y+3/vp.scale);cx.textAlign='left';
+  });
+
+  // Pin label
+  cx.fillStyle='rgba(255,255,255,.25)';cx.font=`${9/vp.scale}px Outfit`;cx.textAlign='center';
+  cx.fillText('⛳ PIN',g.pinX,g.pinY-8/vp.scale);cx.textAlign='left';
+
+  // Ball trail + ball (drawn in world space, viewport applied)
+  drawGhosts(t,s,'aerial',g);
+  drawBallInWorldSpace(t,s,g,'aerial');
+
+  popViewport();
+
+  // Overlay: distance-to-pin readout (in screen space, outside transform)
+  const remYds=Math.round(s.yds*(1-Math.min(t,1)));
+  if(remYds>0&&t<0.98){
+    const rem=Math.round(s.yds*(1-t));
+    cx.fillStyle='rgba(0,0,0,.45)';cx.beginPath();cx.roundRect(W/2-36,H-52,72,22,8);cx.fill();
+    cx.fillStyle='rgba(200,168,75,.9)';cx.font='600 11px Outfit';cx.textAlign='center';
+    cx.fillText(`${rem}y to pin`,W/2,H-36);cx.textAlign='left';
+  }
+}
+
+// Draw ball trail in world (aerial) coordinates — viewport must be active
+function drawBallInWorldSpace(t,s,g,view){
+  if(t<=0.012) return;
+  const col=tcol(s),steps=60,pts=[];
+  for(let i=0;i<=Math.floor(t*steps);i++){
+    const ti=i/steps;const p3=b3(ti,s);const wp=pAerial(p3,s,g);
+    pts.push({x:wp.x,y:wp.y,bz:p3.z});
+  }
+  if(pts.length<2) return;
+  for(let i=1;i<pts.length;i++){
+    cx.strokeStyle=col;cx.globalAlpha=(i/pts.length)*.78;cx.lineWidth=2.5/getViewport(s,g).scale;
+    cx.beginPath();cx.moveTo(pts[i-1].x,pts[i-1].y);cx.lineTo(pts[i].x,pts[i].y);cx.stroke();
+  }
+  cx.globalAlpha=1;
+  const cur=pts[pts.length-1],bz=cur.bz||0;
+  const sc=getViewport(s,g).scale;
+  const bs=5/sc+bz*.028/sc;
+  if(bz>1){
+    const shP=pAerial({...b3(t,s),z:0},s,g);
+    cx.fillStyle='rgba(0,0,0,.28)';cx.beginPath();cx.ellipse(shP.x,shP.y,bs*.85,bs*.35,0,0,Math.PI*2);cx.fill();
+  }
+  cx.fillStyle=col+'2a';cx.beginPath();cx.arc(cur.x,cur.y,bs*2.2,0,Math.PI*2);cx.fill();
+  cx.fillStyle='#fff';cx.shadowColor='#fff';cx.shadowBlur=14/sc;
+  cx.beginPath();cx.arc(cur.x,cur.y,bs,0,Math.PI*2);cx.fill();cx.shadowBlur=0;
+}
+
+// ════════════════════════════════════════
+// BEHIND VIEW — camera sits at ball's lie, looking toward pin
+// ════════════════════════════════════════
+function drawBehind(t,s,g,th){
+  const GY=H*0.66;
+  const camFrac=s._startFrac||0; // where the camera (ball lie) is on the hole
+
+  // Sky
+  const sky=cx.createLinearGradient(0,0,0,GY);
+  sky.addColorStop(0,th.sky1);sky.addColorStop(.55,th.sky2);sky.addColorStop(1,th.sky3);
+  cx.fillStyle=sky;cx.fillRect(0,0,W,H);
+
+  drawHorizonTrees(g,th,GY);
+
+  // Ground rough
+  const gnd=cx.createLinearGradient(0,GY,0,H);
+  gnd.addColorStop(0,th.rough1);gnd.addColorStop(.5,th.rough2);gnd.addColorStop(1,'#060c06');
+  cx.fillStyle=gnd;cx.fillRect(0,GY,W,H-GY);
+  for(let y=GY;y<H;y+=4){const dk=(y-GY)/(H-GY);cx.fillStyle=`rgba(0,0,0,${(.07+dk*.1).toFixed(2)})`;cx.fillRect(0,y,W,4);}
+
+  // Project aerial-space point to behind-view screen space
+  // Camera is at camFrac on the hole, looking toward pin (frac 1)
+  const camC=g.fwAt(camFrac);
+  const pinC=g.fwAt(1);
+  function aerialToBehind(ax,ay){
+    // holeFrac of this point
+    const holeFrac=(g.teeY-ay)/(g.teeY-g.pinY);
+    // distance ahead of camera (in hole fractions)
+    const fracAhead=holeFrac-camFrac;
+    if(fracAhead<-0.01) return null; // behind the camera
+    const worldDist=fracAhead*s.hYds+8;
+    const fov=0.80;
+    const sc=(W*0.44)/(worldDist*fov+1);
+    // x: offset from the vanishing point (pin direction)
+    const vanishX=pinC.x;
+    const lateralOffset=(ax-camC.x)*0.5;
+    const screenX=vanishX+lateralOffset*sc;
+    const screenY=H*0.67-worldDist*fov*0.062*sc;
+    return{x:screenX,y:screenY,sc,worldDist};
+  }
+
+  const{lPts,rPts,N,teeX,pinX,pinY}=g;
+  const lBehind=lPts.map(p=>aerialToBehind(p.x,p.y));
+  const rBehind=rPts.map(p=>aerialToBehind(p.x,p.y));
+
+  // Draw fairway corridor (only points that are ahead of the camera)
+  cx.save();
+  cx.beginPath();
+  let started=false;
+  // Bottom of fairway corridor at camera position
+  const camL=aerialToBehind(g.fwAt(camFrac).x-g.wTee/2,g.teeY+(camFrac*(g.pinY-g.teeY)));
+  const camR=aerialToBehind(g.fwAt(camFrac).x+g.wTee/2,g.teeY+(camFrac*(g.pinY-g.teeY)));
+  if(camL) cx.moveTo(camL.x,GY);
+  for(let i=0;i<=N;i++){
+    const lb=lBehind[i];if(!lb||lb.y>GY) continue;
+    if(!started){cx.moveTo(lb.x,Math.min(lb.y,GY));started=true;}
+    else cx.lineTo(lb.x,Math.min(lb.y,GY));
+  }
+  started=false;
+  for(let i=N;i>=0;i--){
+    const rb=rBehind[i];if(!rb||rb.y>GY) continue;
+    if(!started){cx.lineTo(rb.x,Math.min(rb.y,GY));started=true;}
+    else cx.lineTo(rb.x,Math.min(rb.y,GY));
+  }
+  if(camR) cx.lineTo(camR.x,GY);
+  cx.closePath();
+  const fwg=cx.createLinearGradient(W/2,GY,W/2,GY-130);
+  fwg.addColorStop(0,th.fair1);fwg.addColorStop(.5,th.fair2);fwg.addColorStop(1,th.fair3+'aa');
+  cx.fillStyle=fwg;cx.fill();
+  cx.save();cx.clip();
+  for(let i=0;i<N-1;i+=2){
+    const la=lBehind[i],lb=lBehind[i+1],ra=rBehind[i],rb=rBehind[i+1];
+    if(!la||!lb||!ra||!rb||la.y>GY) continue;
+    cx.beginPath();cx.moveTo(la.x,la.y);cx.lineTo(lb.x,lb.y);cx.lineTo(rb.x,rb.y);cx.lineTo(ra.x,ra.y);cx.closePath();
+    cx.fillStyle='rgba(255,255,255,.028)';cx.fill();
+  }
+  cx.restore();cx.restore();
+
+  // Bunkers — only those AHEAD of ball's lie
+  g.bunkers.forEach(b=>{
+    if(b.frac<=camFrac-0.01) return; // behind camera: skip entirely
+    const bp2=aerialToBehind(b.x,b.y);
+    if(!bp2||bp2.y>GY) return;
+    const sc2=Math.max(0.2,1-bp2.worldDist/s.hYds*.5);
+    cx.save();cx.translate(bp2.x,bp2.y);cx.rotate(b.rot*.3);
+    const bg2=cx.createRadialGradient(0,0,0,0,0,b.rx*sc2);
+    bg2.addColorStop(0,th.sand1);bg2.addColorStop(.8,th.sand2);
+    cx.fillStyle=bg2;cx.beginPath();cx.ellipse(0,0,b.rx*sc2,b.ry*sc2*.5,0,0,Math.PI*2);cx.fill();
+    cx.restore();
+    // Distance label for near bunkers
+    if(bp2.worldDist<s.yds+40){
+      const bunkerYds=Math.round(bp2.worldDist);
+      cx.fillStyle='rgba(220,180,80,.7)';cx.font='8px Outfit';cx.textAlign='center';
+      cx.fillText(`⚠ ${bunkerYds}y`,bp2.x,bp2.y-b.ry*sc2-4);cx.textAlign='left';
+    }
+  });
+
+  // Water — only if ahead of camera
+  if(g.water&&g.water.frac>camFrac-0.01){
+    const w=g.water;
+    const wp=aerialToBehind(w.x,w.y);
+    if(wp&&wp.y<GY){
+      const sc2=Math.max(0.15,1-wp.worldDist/s.hYds*.6);
+      cx.save();cx.translate(wp.x,wp.y);
+      const wg=cx.createRadialGradient(0,0,0,0,0,w.rx*sc2);
+      wg.addColorStop(0,th.water2);wg.addColorStop(.7,th.water1);
+      cx.fillStyle=wg;cx.beginPath();cx.ellipse(0,0,w.rx*sc2,w.ry*sc2*.4,0,0,Math.PI*2);cx.fill();
+      cx.fillStyle=th.water3;cx.beginPath();cx.ellipse(-w.rx*sc2*.1,0,w.rx*sc2*.5,w.ry*sc2*.15,0,0,Math.PI*2);cx.fill();
+      cx.restore();
+    }
+  }
+
+  // Tree walls
+  drawTreeWallBehind(g.treesL,'left',th,GY);
+  drawTreeWallBehind(g.treesR,'right',th,GY);
+
+  // Green — always visible (it's the target)
+  {
+    const gp=aerialToBehind(g.pinX,g.pinY);
+    if(gp&&gp.y<GY){
+      const sc2=Math.max(0.1,Math.min(1,1-gp.worldDist/s.hYds*.75));
+      cx.fillStyle=th.fair3;
+      cx.beginPath();cx.ellipse(gp.x,gp.y,(g.fringeRx+14)*sc2,(g.fringeRy+8)*sc2*.4,g.greenTilt,0,Math.PI*2);cx.fill();
+      const grg=cx.createRadialGradient(gp.x,gp.y,0,gp.x,gp.y,g.fringeRx*sc2);
+      grg.addColorStop(0,th.green1);grg.addColorStop(.7,th.green2);grg.addColorStop(1,th.green3);
+      cx.fillStyle=grg;
+      cx.beginPath();cx.ellipse(gp.x,gp.y,g.fringeRx*sc2,g.fringeRy*sc2*.4,g.greenTilt,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#cc1111';cx.fillRect(gp.x-.5,gp.y-22*sc2,1,22*sc2);
+      cx.fillStyle='#ff4422';cx.beginPath();cx.moveTo(gp.x+1,gp.y-22*sc2);cx.lineTo(gp.x+11*sc2,gp.y-17*sc2);cx.lineTo(gp.x+1,gp.y-12*sc2);cx.fill();
+      // Distance to pin label
+      const distYds=Math.round(gp.worldDist);
+      cx.fillStyle='rgba(255,255,255,.55)';cx.font='8px Outfit';cx.textAlign='center';
+      cx.fillText(`${distYds}y to pin`,gp.x,gp.y+g.fringeRy*sc2*.4+12);cx.textAlign='left';
+    }
+  }
+
+  drawGhosts(t,s,'behind',g);
+  drawBallFull(t,s,g,'behind');
+}
+
+function drawHorizonTrees(g,th,gy){
+  cx.fillStyle=th.tree1;
+  cx.beginPath();cx.moveTo(0,gy+5);
+  for(let x=0;x<=W;x+=7){const n=fbm(x/W*3.5,.1,g.mowSeed);cx.lineTo(x,gy-18-n*52);}
+  cx.lineTo(W,gy+5);cx.closePath();cx.fill();
+  cx.fillStyle=th.tree2;
+  cx.beginPath();cx.moveTo(0,gy+5);
+  for(let x=0;x<=W;x+=5){const n=fbm(x/W*4.5+1.2,.35,g.mowSeed+50);cx.lineTo(x,gy-4-n*32);}
+  cx.lineTo(W,gy+5);cx.closePath();cx.fill();
+}
+function drawTreeWallBehind(trees,side,th,gy){
+  const sorted=[...trees].sort((a,b)=>a.y-b.y);
+  sorted.forEach(tr=>{
+    const xs=side==='left'?Math.min(tr.x+20,W*.45):Math.max(W-tr.x-20,W*.55);
+    const depth=(H-tr.y)/(H-gy);// 0=far 1=close
+    if(depth<0.05) return;
+    const sc=Math.max(.3,depth);
+    const tH=tr.h*sc;const tW=tr.w*sc;
+    const yBase=gy+depth*20;
+    cx.fillStyle='#120e08';cx.fillRect(xs-2*sc,yBase-tH*.28,4*sc,tH*.28);
+    [0,1,2].forEach(layer=>{
+      const lf=layer/2;
+      const lH=tH*(.52-lf*.16);const lW=tW*(1-lf*.38);
+      const lY=yBase-tH*(.2+lf*.25);
+      cx.fillStyle=layer===0?th.tree1:layer===1?th.tree2:th.tree3;
+      cx.beginPath();cx.moveTo(xs,lY-lH);cx.lineTo(xs-lW,lY);cx.lineTo(xs+lW,lY);cx.closePath();cx.fill();
+      cx.fillStyle='rgba(255,255,255,.025)';
+      cx.beginPath();cx.moveTo(xs,lY-lH);cx.lineTo(xs-lW*.25,lY-lH*.3);cx.lineTo(xs,lY-lH*.08);cx.closePath();cx.fill();
+    });
+  });
+}
+
+// ════════════════════════════════════════
+// SIDE VIEW — left=ball lie, right=pin; only shows what's ahead
+// ════════════════════════════════════════
+function drawSide(t,s,g,th){
+  const GY0=H*0.68;
+  const camFracSide=s._startFrac||0;
+  const visRangeSide=Math.max(0.01,1-camFracSide);
+
+  // relFrac: 0=ball lie, 1=pin → screen x
+  // holeFrac: absolute 0..1 → screen x via relative mapping
+  function sideX(relFrac){return 30+relFrac*(W-76);}
+  function holeFracToSideX(hf){return sideX(Math.max(0,(hf-camFracSide)/visRangeSide));}
+
+  // Sky
+  const sky=cx.createLinearGradient(0,0,0,H*.62);
+  sky.addColorStop(0,th.sky1);sky.addColorStop(.4,th.sky2);sky.addColorStop(1,th.sky3);
+  cx.fillStyle=sky;cx.fillRect(0,0,W,H);
+
+  // Background treeline
+  cx.fillStyle=th.tree1;
+  cx.beginPath();cx.moveTo(0,H*.625);
+  for(let x=0;x<=W;x+=6){const n=fbm(x/W*4.5,.65,g.mowSeed+80);cx.lineTo(x,H*.62-n*46);}
+  cx.lineTo(W,H*.625);cx.closePath();cx.fill();
+  cx.fillStyle=th.tree2;
+  cx.beginPath();cx.moveTo(0,H*.625);
+  for(let x=0;x<=W;x+=5){const n=fbm(x/W*5.5+2,.82,g.mowSeed+160);cx.lineTo(x,H*.62-n*28);}
+  cx.lineTo(W,H*.625);cx.closePath();cx.fill();
+
+  // Terrain elevation profile
+  const elevPts=g.elevation;
+  function groundYat(holeFrac){
+    const idx=Math.min(elevPts.length-2,Math.floor(holeFrac*(elevPts.length-1)));
+    const ef=holeFrac*(elevPts.length-1)-idx;
+    const ev=elevPts[idx].e*(1-ef)+elevPts[Math.min(idx+1,elevPts.length-1)].e*ef;
+    return GY0-ev*(H*.08);
+  }
+
+  // Ground shape — mapped from ball lie to pin
+  cx.beginPath();cx.moveTo(0,H);cx.lineTo(0,groundYat(camFracSide));
+  for(let i=0;i<=40;i++){
+    const relF=i/40;
+    const hf=camFracSide+relF*visRangeSide;
+    cx.lineTo(sideX(relF),groundYat(hf));
+  }
+  cx.lineTo(W-46,groundYat(1));cx.lineTo(W,H);cx.closePath();
+  const gnd=cx.createLinearGradient(0,GY0-H*.1,0,H);
+  gnd.addColorStop(0,th.fair1);gnd.addColorStop(.25,th.rough1);gnd.addColorStop(1,th.rough2);
+  cx.fillStyle=gnd;cx.fill();
+
+  // Fairway strip — width reflects aerial bezier width at each position
+  for(let i=0;i<=39;i++){
+    const relF=i/40,relFn=(i+1)/40;
+    const hf=camFracSide+relF*visRangeSide;
+    const hfn=camFracSide+relFn*visRangeSide;
+    const c=g.fwAt(Math.min(1,hf));
+    const wFrac=Math.min(1,c.w/g.wTee);
+    const sh=3+wFrac*7;
+    const x=sideX(relF),xn=sideX(relFn);
+    const gy=groundYat(hf),gyn=groundYat(hfn);
+    cx.fillStyle=i%2===0?th.fair2:th.fair1;
+    cx.beginPath();cx.moveTo(x,gy);cx.lineTo(xn,gyn);cx.lineTo(xn,gyn+sh);cx.lineTo(x,gy+sh);cx.closePath();cx.fill();
+  }
+
+  // Bunkers cross-sections — only those AHEAD of ball's lie
+  const camFracS=s._startFrac||0;
+  const visRangeS=Math.max(0.01,1-camFracS);
+  g.bunkers.forEach(b=>{
+    const bf=b.frac||0.5;
+    if(bf<camFracS-0.02) return; // behind camera: skip
+    const relFrac=(bf-camFracS)/visRangeS;
+    const bx=sideX(relFrac);const gy=groundYat(bf);
+    const bw=b.rx*.38;if(bx<28||bx>W-44) return;
+    const bg2=cx.createLinearGradient(bx-bw,gy,bx+bw,gy);
+    bg2.addColorStop(0,'transparent');bg2.addColorStop(.35,th.sand2);bg2.addColorStop(.5,th.sand1);bg2.addColorStop(.65,th.sand2);bg2.addColorStop(1,'transparent');
+    cx.fillStyle=bg2;cx.beginPath();cx.ellipse(bx,gy+3,bw,4.5,0,0,Math.PI*2);cx.fill();
+    const bRem=Math.round((1-bf)*s.hYds);
+    cx.fillStyle='rgba(220,180,70,.5)';cx.font='7px Outfit';cx.textAlign='center';cx.fillText(`⚠${bRem}y`,bx,gy-8);cx.textAlign='left';
+  });
+
+  // Water cross-section — only if ahead of ball
+  if(g.water&&g.water.frac>camFracS-0.02){
+    const wf=g.water.frac;
+    const relFrac=(wf-camFracS)/visRangeS;
+    const wx=sideX(relFrac);const gy=groundYat(wf);
+    const ww=g.water.rx*.38;
+    if(wx>=28&&wx<=W-44){
+      const wg=cx.createLinearGradient(wx-ww,gy,wx+ww,gy);
+      wg.addColorStop(0,'transparent');wg.addColorStop(.3,th.water1);wg.addColorStop(.5,th.water2);wg.addColorStop(.7,th.water1);wg.addColorStop(1,'transparent');
+      cx.fillStyle=wg;cx.fillRect(wx-ww,gy,ww*2,5);
+      cx.strokeStyle=th.water3;cx.lineWidth=.8;cx.beginPath();cx.moveTo(wx-ww,gy);cx.lineTo(wx+ww,gy);cx.stroke();
+    }
+  }
+
+  // Coastal cliff
+  if(g.cliff){
+    const cf=g.cliff.frac||.5;
+    if(cf>camFracSide-0.02){
+      const cx2=holeFracToSideX(cf);const gy=groundYat(cf);
+      const cg=cx.createLinearGradient(cx2,gy,cx2,gy+g.cliff.height);
+      cg.addColorStop(0,'#3a3228');cg.addColorStop(1,'#181410');
+      cx.fillStyle=cg;cx.fillRect(cx2,gy,W-cx2+10,g.cliff.height);
+      cx.fillStyle=th.water1;cx.fillRect(cx2,gy+g.cliff.height,W-cx2+10,24);
+      cx.strokeStyle='rgba(20,80,160,.3)';cx.lineWidth=1;
+      for(let i=0;i<3;i++){const wy=gy+g.cliff.height+5+i*8;
+        cx.beginPath();for(let x2=cx2;x2<=W;x2+=8){const n=Math.sin(x2*.04+i)*2.5;x2===cx2?cx.moveTo(x2,wy+n):cx.lineTo(x2,wy+n);}cx.stroke();}
+    }
+  }
+
+  // Side trees (frame edges)
+  [{tr:g.treesL[0],side:'left'},{tr:g.treesL[1]||g.treesL[0],side:'left'},
+   {tr:g.treesR[0],side:'right'},{tr:g.treesR[1]||g.treesR[0],side:'right'}].forEach(({tr,side})=>{
+    if(!tr) return;
+    const xs=side==='left'?12:W-12;const gy=groundYat(side==='left'?camFracSide:1);
+    const h2=tr.h*.85,w2=tr.w*.75;
+    cx.fillStyle='#100c08';cx.fillRect(xs-2,gy-h2*.28,4,h2*.28);
+    [0,1,2].forEach(layer=>{
+      const lf=layer/2,lH=h2*(.5-lf*.15),lW=w2*(1-lf*.38),lY=gy-h2*(.18+lf*.24);
+      cx.fillStyle=layer===0?th.tree1:layer===1?th.tree2:th.tree3;
+      cx.beginPath();cx.moveTo(xs,lY-lH);cx.lineTo(xs-lW,lY);cx.lineTo(xs+lW,lY);cx.closePath();cx.fill();
+    });
+  });
+
+  // Green surface at pin end (always at right edge x=W-46)
+  {const px=W-46;const gy=groundYat(1);
+   const grg=cx.createLinearGradient(px-30,gy-6,px+30,gy);
+   grg.addColorStop(0,th.fair3);grg.addColorStop(.5,th.green1);grg.addColorStop(1,th.green2);
+   cx.fillStyle=grg;cx.beginPath();cx.ellipse(px,gy-3,32,6,0,0,Math.PI);cx.fill();
+   cx.fillStyle=th.green1;cx.fillRect(px-32,gy-6,64,6);
+   cx.strokeStyle=th.fair3;cx.lineWidth=2;cx.beginPath();cx.moveTo(px-38,gy);cx.lineTo(px+38,gy);cx.stroke();
+   cx.fillStyle='rgba(200,168,75,.12)';cx.fillRect(px-.5,gy-H*.24,1,H*.24);
+   cx.fillStyle='#cc1111';cx.fillRect(px-.5,gy-30,1.5,30);
+   cx.fillStyle='#ff4422';cx.beginPath();cx.moveTo(px+1.5,gy-30);cx.lineTo(px+11,gy-25);cx.lineTo(px+1.5,gy-19);cx.fill();
+   cx.fillStyle='rgba(200,168,75,.45)';cx.font='8px Outfit';cx.textAlign='center';cx.fillText('PIN',px,gy-34);cx.textAlign='left';
+  }
+
+  // Ball lie marker at left edge
+  {const bx=sideX(0);const gy=groundYat(camFracSide);
+   cx.fillStyle='rgba(200,168,75,.6)';cx.font='8px Outfit';cx.textAlign='center';
+   cx.fillText('●',bx,gy-10);cx.textAlign='left';}
+
+  // Yardage markers — distance remaining to pin from each marker position
+  [.25,.5,.75,1].forEach(f=>{
+    const hf=camFracSide+f*visRangeSide;
+    const remainYds=Math.round((1-hf)*s.hYds);
+    const x=sideX(f);const gy=groundYat(hf);
+    cx.fillStyle='rgba(255,255,255,.08)';cx.fillRect(x,gy,1.5,8);
+    cx.fillStyle='rgba(255,255,255,.25)';cx.font='8px Outfit';cx.textAlign='center';
+    cx.fillText(remainYds+'y',x,gy+18);cx.textAlign='left';
+  });
+
+  // Ghost full arc
+  const col=tcol(s);
+  cx.strokeStyle=col+'1e';cx.lineWidth=1.5;cx.setLineDash([4,6]);
+  cx.beginPath();
+  for(let i=0;i<=70;i++){const ti=i/70;const p=b3(ti,s);const sc2=pSide(p,s,g);i===0?cx.moveTo(sc2.x,sc2.y):cx.lineTo(sc2.x,sc2.y);}
+  cx.stroke();cx.setLineDash([]);
+
+  drawGhosts(t,s,'side',g);
+  drawBallFull(t,s,g,'side');
+
+  // Apex label
+  if(t>.42&&t<.58&&s.type!=='ground'&&s.type!=='putt'){
+    const ap=b3(.5,s);const apS=pSide(ap,s,g);
+    const apFt=Math.round(ap.z*3.28);
+    cx.fillStyle='rgba(200,168,75,.8)';cx.font='600 10px Outfit';cx.textAlign='center';
+    cx.fillText(`▲ ${apFt} ft`,apS.x,apS.y-13);cx.textAlign='left';
+  }
+}
+
+// ════════════════════════════════════════
+// FULL HOLE VIEW — shows entire hole with all shots; uses a fixed viewport
+// ════════════════════════════════════════
+function drawHole(t,s,g,th){
+  // For full hole view, camera shows from tee (frac 0) to pin (frac 1)
+  // We create a synthetic "whole hole" shot context
+  const fullS={...s,_startFrac:0,yds:s.hYds,hYds:s.hYds};
+  const vp=getViewport(fullS,g);
+
+  // Background
+  const bg=cx.createRadialGradient(W/2,H/2,0,W/2,H/2,490);
+  bg.addColorStop(0,th.rough1);bg.addColorStop(1,th.rough2);
+  cx.fillStyle=bg;cx.fillRect(0,0,W,H);
+
+  pushViewport(vp);
+
+  // Water, fairway, bunkers, green, trees — all features visible
+  if(g.water) drawWaterAerial(g,th);
+  const{lPts,rPts,N}=g;
+  cx.beginPath();cx.moveTo(lPts[0].x,lPts[0].y);
+  lPts.forEach(p=>cx.lineTo(p.x,p.y));rPts.slice().reverse().forEach(p=>cx.lineTo(p.x,p.y));cx.closePath();
+  const fwg=cx.createLinearGradient(W/2,g.teeY,W/2,g.pinY);
+  fwg.addColorStop(0,th.fair1);fwg.addColorStop(.5,th.fair2);fwg.addColorStop(1,th.fair3);
+  cx.fillStyle=fwg;cx.fill();
+  cx.save();cx.beginPath();cx.moveTo(lPts[0].x,lPts[0].y);
+  lPts.forEach(p=>cx.lineTo(p.x,p.y));rPts.slice().reverse().forEach(p=>cx.lineTo(p.x,p.y));
+  cx.closePath();cx.clip();
+  for(let i=0;i<N;i+=2){const l=lPts[i],ln=lPts[i+1]||lPts[i],r=rPts[i],rn=rPts[i+1]||rPts[i];cx.beginPath();cx.moveTo(l.x,l.y);cx.lineTo(ln.x,ln.y);cx.lineTo(rn.x,rn.y);cx.lineTo(r.x,r.y);cx.closePath();cx.fillStyle='rgba(255,255,255,.022)';cx.fill();}
+  cx.restore();
+  g.bunkers.forEach(b=>{cx.save();cx.translate(b.x,b.y);cx.rotate(b.rot||0);const bg2=cx.createRadialGradient(-b.rx*.2,-b.ry*.2,0,0,0,Math.max(b.rx,b.ry));bg2.addColorStop(0,th.sand1);bg2.addColorStop(.8,th.sand2);bg2.addColorStop(1,'rgba(140,100,40,.2)');cx.fillStyle=bg2;cx.beginPath();cx.ellipse(0,0,b.rx,b.ry,0,0,Math.PI*2);cx.fill();cx.strokeStyle='rgba(90,60,15,.45)';cx.lineWidth=1.5/vp.scale;cx.stroke();cx.restore();});
+  drawGreenAerial(g,th);drawTreeCanopy(g,th);
+
+  // Tee marker
+  cx.strokeStyle='rgba(200,168,75,.55)';cx.lineWidth=1.5/vp.scale;cx.beginPath();cx.arc(g.teeX,g.teeY,9/vp.scale,0,Math.PI*2);cx.stroke();
+  cx.fillStyle='rgba(200,168,75,.18)';cx.fill();
+  cx.fillStyle='rgba(255,255,255,.2)';cx.font=`${9/vp.scale}px Outfit`;cx.textAlign='center';
+  cx.fillText('⛳',g.pinX,g.pinY-8/vp.scale);cx.fillText('TEE',g.teeX,g.teeY+20/vp.scale);cx.textAlign='left';
+
+  // Draw all shots for this hole
+  const hShots=flat.filter(x=>x.hN===s.hN&&!x.isPutt);
+  const myI=hShots.indexOf(s);
+  hShots.forEach((hs,i)=>{
+    const done=i<myI,active=i===myI,p2=done?1:(active?t:0);
+    if(p2<=0) return;
+    const col=tcol(hs);
+    cx.strokeStyle=col+(done?'88':'ee');cx.lineWidth=(done?1.8:2.6)/vp.scale;
+    cx.beginPath();
+    for(let j=0;j<=Math.floor(p2*70);j++){
+      const tj=j/70;const wp=pAerial(b3(tj,hs),hs,g);
+      j===0?cx.moveTo(wp.x,wp.y):cx.lineTo(wp.x,wp.y);
+    }
+    cx.stroke();
+    if(done){
+      const ep=pAerial(b3(1,hs),hs,g);
+      cx.fillStyle=col;cx.beginPath();cx.arc(ep.x,ep.y,5/vp.scale,0,Math.PI*2);cx.fill();
+      cx.fillStyle='rgba(255,255,255,.8)';cx.font=`bold ${9/vp.scale}px Outfit`;
+      cx.fillText(`${i+1}·${hs.club}`,ep.x+6/vp.scale,ep.y-3/vp.scale);
+    }
+    if(active&&p2>0){
+      const cp=pAerial(b3(p2,hs),hs,g);
+      const bz=b3(p2,hs).z;const bs=(5+bz*.028)/vp.scale;
+      const sh=pAerial({...b3(p2,hs),z:0},hs,g);
+      cx.fillStyle='rgba(0,0,0,.28)';cx.beginPath();cx.ellipse(sh.x,sh.y,bs*.85,bs*.35,0,0,Math.PI*2);cx.fill();
+      cx.fillStyle='#fff';cx.shadowColor='#fff';cx.shadowBlur=12/vp.scale;
+      cx.beginPath();cx.arc(cp.x,cp.y,bs,0,Math.PI*2);cx.fill();cx.shadowBlur=0;
+    }
+  });
+
+  popViewport();
+}
+
+// ════════════════════════════════════════
+// BALL — unified for all views
+// ════════════════════════════════════════
+function drawBallFull(t,s,g,view){
+  if(t<=0.012) return;
+  const pfn={aerial:(p3,s)=>pAerial(p3,s,g),behind:(p3,s)=>pBehind(p3,s,g),side:(p3,s)=>pSide(p3,s,g)}[view];
+  if(!pfn) return;
+  const col=tcol(s),steps=view==='side'?70:50,pts=[];
+  for(let i=0;i<=Math.floor(t*steps);i++){
+    const ti=i/steps;const p3=b3(ti,s);pts.push({...pfn(p3,s),bz:p3.z,ti});
+  }
+  if(pts.length<2) return;
+  // Trail
+  for(let i=1;i<pts.length;i++){
+    cx.strokeStyle=col;cx.globalAlpha=(i/pts.length)*.76;cx.lineWidth=2.4;
+    cx.beginPath();cx.moveTo(pts[i-1].x,pts[i-1].y);cx.lineTo(pts[i].x,pts[i].y);cx.stroke();
+  }
+  cx.globalAlpha=1;
+  const cur=pts[pts.length-1];const bz=cur.bz||0;
+  const bs=view==='behind'?(5+bz*.024):view==='side'?5:(4+bz*.028);
+  // Shadow
+  if(bz>1){
+    const shP=pfn({...b3(t,s),z:0},s);
+    cx.fillStyle='rgba(0,0,0,.28)';
+    cx.beginPath();cx.ellipse(shP.x,shP.y,bs*.8,view==='side'?2:2.5,0,0,Math.PI*2);cx.fill();
+  }
+  // Glow halo
+  cx.fillStyle=col+'2a';cx.beginPath();cx.arc(cur.x,cur.y,bs*2.4,0,Math.PI*2);cx.fill();
+  // Ball
+  cx.fillStyle='#ffffff';cx.shadowColor='#ffffff';cx.shadowBlur=16;
+  cx.beginPath();cx.arc(cur.x,cur.y,bs,0,Math.PI*2);cx.fill();cx.shadowBlur=0;
+  // Dimple
+  cx.fillStyle='rgba(190,190,190,.35)';
+  cx.beginPath();cx.arc(cur.x-bs*.3,cur.y-bs*.3,bs*.24,0,Math.PI*2);cx.fill();
+}
+
+// ════════════════════════════════════════
+// GHOST TRAILS — previous shots shown faded
+// For aerial: drawn in world space (viewport must be active)
+// For behind/side: drawn in screen space
+// ════════════════════════════════════════
+function drawGhosts(t,s,view,g){
+  const prev=flat.slice(0,si).filter(x=>!x.isPutt).slice(-3);
+  const pfn={
+    behind:(p3,ps)=>pBehind(p3,ps,g),
+    side:(p3,ps)=>pSide(p3,ps,g),
+    aerial:(p3,ps)=>pAerial(p3,ps,g),
+    hole:(p3,ps)=>pAerial(p3,ps,g)
+  }[view];
+  if(!pfn) return;
+  prev.forEach((ps,i)=>{
+    const a=(i+1)/prev.length*.16;
+    cx.strokeStyle=tcol(ps);cx.globalAlpha=a;cx.lineWidth=view==='aerial'?2:1.4;cx.setLineDash([2,5]);
+    cx.beginPath();
+    for(let j=0;j<=32;j++){const tj=j/32;const sc2=pfn(b3(tj,ps),ps);j===0?cx.moveTo(sc2.x,sc2.y):cx.lineTo(sc2.x,sc2.y);}
+    cx.stroke();cx.setLineDash([]);cx.globalAlpha=1;
+  });
+}
+
+// ════════════════════════════════════════
+// MASTER DRAW
+// ════════════════════════════════════════
+function drawScene(t){
+  cx.clearRect(0,0,W,H);
+  if(!round||!flat.length){cx.fillStyle='#040a05';cx.fillRect(0,0,W,H);return;}
+  const s=flat[si];if(!s){return;}
+  const g=mkGeom(s.hN,s.hYds,s.hDog||'none',s.hWater||false,round.terrain||'pines');
+  const th=theme(round.terrain||'pines');
+  if(cam==='aerial')      drawAerial(t,s,g,th);
+  else if(cam==='behind') drawBehind(t,s,g,th);
+  else if(cam==='side')   drawSide(t,s,g,th);
+  else if(cam==='hole')   drawHole(t,s,g,th);
+}
+
+// ════════════════════════════════════════
+// PLAYBACK ENGINE
+// ════════════════════════════════════════
+let rafId=null;
+function tog(){
+  if(!round){toast('Load a round first');return;}
+  playing=!playing;
+  document.getElementById('plb').textContent=playing?'⏸':'▶';
+  if(playing){lastT=null;rafId=requestAnimationFrame(loop);}
+  else if(rafId){cancelAnimationFrame(rafId);}
+}
+function loop(now){
+  if(!playing){return;}
+  if(!lastT) lastT=now;
+  const dt=now-lastT;lastT=now;
+  if(dt>200){rafId=requestAnimationFrame(loop);return;}// tab was hidden
+  prog+=dt/DUR*SPEEDS[spI];
+  if(prog>=1){
+    prog=0;
+    const prevHole=flat[si]?.hN;
+    si++;
+    if(si>=flat.length){
+      si=flat.length-1;prog=1;playing=false;
+      document.getElementById('plb').textContent='▶';
+      upUI();upPB();drawScene(prog);
+      setTimeout(showSum,400);return;
+    }
+    if(flat[si].hN!==prevHole){holeFlash();}
+    upUI();scrThumb();
+  }
+  upPB();drawScene(prog);
+  rafId=requestAnimationFrame(loop);
+}
+function prev(){stop();si=Math.max(0,si-1);prog=0;upUI();upPB();scrThumb();drawScene(0);}
+function nxt(){stop();si=Math.min(flat.length-1,si+1);prog=0;upUI();upPB();scrThumb();drawScene(0);}
+function rew(){stop();prog=0;upPB();drawScene(0);}
+function stop(){playing=false;document.getElementById('plb').textContent='▶';if(rafId)cancelAnimationFrame(rafId);}
+function cyc(){spI=(spI+1)%SPEEDS.length;document.getElementById('spd').textContent=SPEEDS[spI]+'×';toast(`Speed ${SPEEDS[spI]}×`);}
+function jmp(i){stop();si=i;prog=0;upUI();upPB();scrThumb();drawScene(0);}
+function holeFlash(){
+  const f=document.getElementById('hole-flash');
+  f.classList.add('flash');setTimeout(()=>f.classList.remove('flash'),320);
+}
+
+// Progress bar + scrubbing
+document.getElementById('pbb').addEventListener('click',scrub);
+document.getElementById('pbb').addEventListener('touchstart',e=>{e.preventDefault();scrubTouch(e);},{passive:false});
+document.getElementById('pbb').addEventListener('touchmove',e=>{e.preventDefault();scrubTouch(e);},{passive:false});
+function scrub(e){const r=e.currentTarget.getBoundingClientRect();prog=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));stop();upPB();drawScene(prog);}
+function scrubTouch(e){const r=e.currentTarget.getBoundingClientRect();const x=e.touches[0].clientX;prog=Math.max(0,Math.min(1,(x-r.left)/r.width));stop();upPB();drawScene(prog);}
+
+function upPB(){
+  const p=prog*100;
+  document.getElementById('pbf').style.width=p+'%';
+  document.getElementById('pbt').style.left=p+'%';
+  document.getElementById('scpf').style.width=p+'%';
+}
+
+// ════════════════════════════════════════
+// UI UPDATES
+// ════════════════════════════════════════
+function upUI(){
+  const s=flat[si];if(!s) return;
+  document.getElementById('scl').textContent=`Shot ${si+1} of ${flat.length}`;
+  document.getElementById('sct').textContent=s.isPutt?`Putt · ${s.yds} ft`:`${CLUBS[s.club]||s.club} · ${s.yds} yds`;
+  document.getElementById('scn').textContent=s.note||' ';
+  document.getElementById('syds').textContent=s.yds;
+  document.getElementById('sclub').textContent=s.club;
+  document.getElementById('straj').textContent={high:'High',line:'Line',low:'Low',ground:'Ground',putt:'Roll'}[s.type]||'—';
+  document.getElementById('sholn').textContent=s.hN;
+  document.getElementById('ts').textContent=`Hole ${s.hN} — ${s.hName} · Par ${s.hPar} · ${s.hYds}y`;
+  document.getElementById('pbl1').textContent=`H${s.hN}`;
+  document.getElementById('pbr1').textContent=s.hName;
+  document.getElementById('cnt').textContent=`${si+1} / ${flat.length}`;
+  document.querySelectorAll('.st').forEach((el,i)=>el.classList.toggle('on',i===si));
+}
+
+function buildStrip(){
+  const strip=document.getElementById('ss');
+  let lastHole=null;
+  strip.innerHTML=flat.map((s,i)=>{
+    const holeLabel=s.hN!==lastHole?`<div class="st-hn">H${s.hN}</div>`:'<div class="st-hn"> </div>';
+    lastHole=s.hN;
+    return`<div class="st ${i===0?'on':''}" onclick="jmp(${i})">${holeLabel}<div class="st-n">${i+1}</div><div class="st-c">${s.club}</div><div class="st-y">${s.yds}y</div><div class="st-dot" style="background:${tcol(s)}"></div></div>`;
+  }).join('');
+  // Tick marks with hole separators
+  const ticks=document.getElementById('pbtk');
+  let ph=null;
+  ticks.innerHTML=flat.map((_,i)=>{
+    const hn=flat[i].hN;const isHole=hn!==ph;ph=hn;
+    const pct=(i/flat.length*100).toFixed(1)+'%';
+    return`<div class="tk${isHole?' hn':''}" style="left:${pct}"></div>`;
+  }).join('');
+}
+
+function scrThumb(){
+  const el=document.getElementById('ss').children[si];
+  if(el) el.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+}
+
+// Camera
+function setCam(el){
+  document.querySelectorAll('.cb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');cam=el.dataset.c;stop();drawScene(prog);
+}
+function cycleCam(){
+  const idx=CAMS.indexOf(cam);cam=CAMS[(idx+1)%CAMS.length];
+  document.querySelectorAll('.cb').forEach(el=>el.classList.toggle('on',el.dataset.c===cam));
+  stop();drawScene(prog);toast(`Camera: ${cam.charAt(0).toUpperCase()+cam.slice(1)}`);
+}
+
+// ════════════════════════════════════════
+// ROUND SUMMARY
+// ════════════════════════════════════════
+function showSum(){
+  if(!round){toast('Load a round first');return;}
+  const diff=round.score-round.totalPar;
+  const totP=round.holes.reduce((a,h)=>a+(h.shots.find(s=>'putts' in s)?.putts||0),0);
+  const totS=round.holes.reduce((a,h)=>a+h.shots.reduce((b,s)=>'putts' in s?b+s.putts:b+1,0),0);
+  const gir=round.holes.filter(h=>{const a=h.shots.filter(x=>!('putts' in x));return a.length<=h.par-2;}).length;
+  const fir=round.holes.filter(h=>{const a=h.shots.filter(x=>!('putts' in x));return a.length>0&&(a[0].yds>220||a[0].type==='line');}).length;
+  document.getElementById('sumsub').textContent=`${round.courseName} · ${round.holes.length} Holes`;
+  document.getElementById('sg').innerHTML=`
+    <div class="sst"><div class="sstv" style="color:var(--gold)">${diff===0?'E':diff>0?'+'+diff:diff}</div><div class="sstl">Score</div></div>
+    <div class="sst"><div class="sstv">${totS}</div><div class="sstl">Shots</div></div>
+    <div class="sst"><div class="sstv" style="color:var(--blue)">${totP}</div><div class="sstl">Putts</div></div>
+    <div class="sst"><div class="sstv" style="color:var(--teal)">${gir}</div><div class="sstl">GIR</div></div>
+    <div class="sst"><div class="sstv">${fir}</div><div class="sstl">FIR</div></div>
+    <div class="sst"><div class="sstv" style="color:var(--gl)">${round.totalPar}</div><div class="sstl">Par</div></div>`;
+  const tc={high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b'};
+  document.getElementById('sh').innerHTML=round.holes.map(h=>{
+    const app=h.shots.filter(s=>!('putts' in s)),pt=h.shots.find(s=>'putts' in s);
+    const tot=app.length+(pt?.putts||0),d=tot-h.par;
+    const sc=d<=-2?'e2':d===-1?'b2':d===0?'p2':d===1?'g2':'d2';
+    const str=d===0?'E':d>0?'+'+d:d;
+    const pills=app.map(s=>`<span class="sp2" style="border-left:3px solid ${tc[s.type]||'#666'}">${s.club} ${s.yds}y</span>`).join('');
+    const pp=pt?`<span class="sp2" style="opacity:.42">${pt.putts}pt</span>`:'';
+    return`<div class="hr"><div class="hnn">${h.n}</div><div class="hsh">${pills}${pp}</div><div class="hsc ${sc}">${str}</div></div>`;
+  }).join('');
+  document.getElementById('sum').classList.add('on');
+  stop();
+}
+function hideSum(){document.getElementById('sum').classList.remove('on');drawScene(prog);}
+
+// ════════════════════════════════════════
+// HISTORY — read from localStorage written by golf_tracer.html
+// ════════════════════════════════════════
+const HIST_PFX='links_hist_';
+
+function getHistoryRounds(){
+  const rounds=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!k.startsWith(HIST_PFX)) continue;
+    try{const r=JSON.parse(localStorage.getItem(k));if(r)rounds.push({key:k,round:r});}
+    catch(e){}
+  }
+  // Sort newest first (keys contain timestamp suffix)
+  return rounds.sort((a,b)=>b.key.localeCompare(a.key));
+}
+
+function deleteHistoryRound(key){
+  localStorage.removeItem(key);
+  initModal();
+  toast('Round deleted');
+}
+
+let _pendingDeleteKey=null;
+
+function confirmDeleteRound(key,name,date){
+  _pendingDeleteKey=key;
+  document.getElementById('del-title').textContent='Delete this round?';
+  document.getElementById('del-sub').textContent=`${name} · ${date}`;
+  document.getElementById('del-confirm').style.display='flex';
+}
+function executeDelete(){
+  if(_pendingDeleteKey) deleteHistoryRound(_pendingDeleteKey);
+  _pendingDeleteKey=null;
+  document.getElementById('del-confirm').style.display='none';
+}
+function cancelDelete(){
+  _pendingDeleteKey=null;
+  document.getElementById('del-confirm').style.display='none';
+}
+
+function confirmClearAll(){
+  if(!confirm('Delete all saved rounds? This cannot be undone.')) return;
+  for(let i=localStorage.length-1;i>=0;i--){
+    const k=localStorage.key(i);
+    if(k&&k.startsWith(HIST_PFX)) localStorage.removeItem(k);
+  }
+  initModal();
+  toast('All rounds cleared');
+}
+
+// ════════════════════════════════════════
+// LOAD ROUND
+// ════════════════════════════════════════
+function initModal(){
+  // Build history section
+  const histRounds=getHistoryRounds();
+  const sec=document.getElementById('my-rounds-section');
+  const histList=document.getElementById('history-list');
+
+  if(histRounds.length>0){
+    sec.style.display='block';
+    histList.innerHTML=histRounds.map(({key,round:r})=>{
+      const d=r.score-r.totalPar;
+      const ds=d===0?'E':d>0?`+${d}`:d;
+      const badge=r._trackedRound?`<div class="hrc-badge">📍 GPS Tracked</div>`:'';
+      return`<div class="hrc" onclick="loadHistoryRound('${key}')">
+        <div class="hrc-icon">⛳</div>
+        <div class="hrc-info">
+          <div class="hrc-name">${r.courseName}</div>
+          <div class="hrc-meta">${r.date} · ${r.holes.length} holes · Par ${r.totalPar}</div>
+          ${badge}
+        </div>
+        <div class="hrc-score">${ds}<span>SCORE</span></div>
+        <div class="hrc-del" onclick="event.stopPropagation();confirmDeleteRound('${key}','${r.courseName}','${r.date}')">🗑</div>
+      </div>`;
+    }).join('');
+    // Hide "Demo Rounds" label when My Rounds is visible — less cluttered
+    document.getElementById('demo-label').style.display='none';
+  } else {
+    sec.style.display='none';
+    document.getElementById('demo-label').style.display='block';
+  }
+
+  // Build demo section
+  document.getElementById('dl').innerHTML=ROUNDS.map(r=>{
+    const d=r.score-r.totalPar,ds=d===0?'E':d>0?'+'+d:d;
+    return`<div class="rc" onclick="loadRound('${r.id}')"><div class="rci">⛳</div><div class="rci2"><div class="rcn">${r.courseName}</div><div class="rcm">${r.date} · ${r.holes.length} holes · Par ${r.totalPar} · ${r.terrain==='coastal'?'🌊 Coastal':'🌲 Pines'}</div></div><div class="rcs">${ds}<span>SCORE</span></div></div>`;
+  }).join('');
+}
+
+function loadHistoryRound(key){
+  try{
+    const r=JSON.parse(localStorage.getItem(key));
+    if(!r){toast('Round data not found');return;}
+    // Add to ROUNDS array if not already there
+    const existing=ROUNDS.find(x=>x.id===r.id);
+    if(!existing) ROUNDS.push(r);
+    loadRound(r.id);
+  } catch(e){ toast('Could not load round'); }
+}
+
+function loadRound(id){
+  round=ROUNDS.find(r=>r.id===id);
+  if(!round) return;
+  flat=flatten(round);geomCache={};
+  si=0;prog=0;playing=false;
+  document.getElementById('lm').style.display='none';
+  document.getElementById('tt').textContent=`LINKS · ${round.courseName}`;
+  document.getElementById('ts').textContent=round.date||'';
+  // Show video export button now that a round is loaded
+  document.getElementById('vid-btn').style.display='flex';
+  buildStrip();upUI();upPB();
+  setTimeout(()=>{drawScene(0);toast('▶ Tap play to start replay');},80);
+}
+
+function loadCustom(){
+  const clubs=['D','3W','5W','5i','6i','7i','8i','9i','PW','SW'];
+  const types=['high','line','low','ground'];
+  const par=[4,5,4,3,4,4,5,3,4],yds=[420,545,375,190,460,440,555,175,450];
+  const dogs=['right','none','left','none','right','none','none','left','right'];
+  const wtr=[false,false,true,false,true,true,false,false,false];
+  const terrain=Math.random()>.5?'pines':'coastal';
+  const holes=par.map((p,i)=>{
+    const n=i+1,y=yds[i];
+    const sn=Math.max(1,p-1+Math.floor(Math.random()*2));
+    const shots=Array.from({length:sn},(_,j)=>({
+      club:j===0&&p>=4?'D':clubs[Math.floor(Math.random()*clubs.length)],
+      type:types[Math.floor(Math.random()*types.length)],
+      yds:60+Math.floor(Math.random()*220),note:'Simulated shot'
+    }));
+    shots.push({putts:1+Math.floor(Math.random()*2)});
+    return{n,par:p,yds:y,name:`Hole ${n}`,dogleg:dogs[i],water:wtr[i],shots};
+  });
+  const r={id:'c'+Date.now(),courseName:'Custom Round',date:'Today',terrain,
+    totalPar:par.reduce((a,b)=>a+b,0),
+    score:holes.reduce((a,h)=>a+h.shots.reduce((b,s)=>'putts' in s?b+s.putts:b+1,0),0),holes};
+  ROUNDS.push(r);loadRound(r.id);
+}
+
+// ════════════════════════════════════════
+// VIDEO EXPORT — MediaRecorder + canvas.captureStream()
+// ════════════════════════════════════════
+let _vidRecorder=null;
+let _vidChunks=[];
+let _vidRaf=null;
+let _vidPlaying=false;
+let _vidSi=0;
+let _vidProg=0;
+let _vidLastT=null;
+const VID_SPEED=2.0;  // record at 2× so final video is reasonably short
+const VID_FPS=30;
+
+async function startVideoExport(){
+  if(!round){toast('Load a round first');return;}
+  if(!('MediaRecorder' in window)){
+    toast('Video export not supported on this browser');return;
+  }
+  // Stop any current playback
+  stop();
+
+  // Show progress UI
+  const prog=document.getElementById('vid-progress');
+  prog.style.display='flex';
+  document.getElementById('vid-status').textContent='Starting recording…';
+  document.getElementById('vid-sub').textContent='Playing through all shots at 2× speed';
+  document.getElementById('vid-bar').style.width='0%';
+
+  // Capture canvas stream
+  let stream;
+  try{
+    stream=cv.captureStream(VID_FPS);
+  } catch(e){
+    prog.style.display='none';
+    toast('Canvas capture not supported — try Chrome');
+    return;
+  }
+
+  // Pick best supported codec
+  const codecPrefs=['video/mp4;codecs=avc1','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  const mimeType=codecPrefs.find(c=>MediaRecorder.isTypeSupported(c))||'video/webm';
+
+  _vidChunks=[];
+  try{
+    _vidRecorder=new MediaRecorder(stream,{mimeType,videoBitsPerSecond:4_000_000});
+  } catch(e){
+    _vidRecorder=new MediaRecorder(stream);
+  }
+
+  _vidRecorder.ondataavailable=e=>{if(e.data.size>0)_vidChunks.push(e.data);};
+  _vidRecorder.onstop=()=>finishVideoExport(mimeType);
+  _vidRecorder.start(100);// collect every 100ms
+
+  // Reset replay to beginning
+  _vidSi=0;_vidProg=0;_vidLastT=null;_vidPlaying=true;
+  geomCache={};
+  drawScene(0);
+
+  document.getElementById('vid-status').textContent='Recording replay…';
+  _vidRaf=requestAnimationFrame(vidLoop);
+}
+
+function vidLoop(now){
+  if(!_vidPlaying){return;}
+  if(!_vidLastT) _vidLastT=now;
+  const dt=now-_vidLastT;_vidLastT=now;
+  if(dt>200){_vidRaf=requestAnimationFrame(vidLoop);return;}
+
+  _vidProg+=dt/DUR*VID_SPEED;
+
+  // Update progress bar
+  const totalShots=flat.length;
+  const pct=((_vidSi+_vidProg)/totalShots)*100;
+  document.getElementById('vid-bar').style.width=Math.min(100,pct).toFixed(1)+'%';
+  document.getElementById('vid-status').textContent=
+    `Recording shot ${_vidSi+1} of ${totalShots}…`;
+
+  if(_vidProg>=1){
+    _vidProg=0;_vidSi++;
+    if(_vidSi>=flat.length){
+      // Done — stop recorder
+      _vidPlaying=false;
+      setTimeout(()=>{
+        if(_vidRecorder&&_vidRecorder.state!=='inactive') _vidRecorder.stop();
+      },400);// let last frames flush
+      document.getElementById('vid-status').textContent='Finalising…';
+      document.getElementById('vid-sub').textContent='Preparing your video file';
+      document.getElementById('vid-bar').style.width='100%';
+      return;
+    }
+  }
+
+  // Draw the current frame — temporarily override state vars
+  const savedSi=si,savedProg=prog;
+  si=_vidSi;prog=_vidProg;
+  drawScene(prog);
+  si=savedSi;prog=savedProg;
+
+  _vidRaf=requestAnimationFrame(vidLoop);
+}
+
+function finishVideoExport(mimeType){
+  document.getElementById('vid-progress').style.display='none';
+  const ext=mimeType.startsWith('video/mp4')?'mp4':'webm';
+  const blob=new Blob(_vidChunks,{type:mimeType});
+  const url=URL.createObjectURL(blob);
+
+  // Trigger download / share
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`LINKS_${(round.courseName||'round').replace(/\s+/g,'_')}_${round.date||'replay'}.${ext}`;
+
+  // On iPhone Safari, we can't programmatically download to Files — open in new tab
+  const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isiOS){
+    // Show share sheet
+    if(navigator.share&&navigator.canShare({files:[new File([blob],a.download,{type:mimeType})]})){
+      navigator.share({
+        title:'LINKS Round Replay',
+        text:`My round at ${round.courseName}`,
+        files:[new File([blob],a.download,{type:mimeType})]
+      }).catch(()=>{
+        // Fallback: open video in new tab
+        window.open(url,'_blank');
+      });
+    } else {
+      window.open(url,'_blank');
+      toast('Video ready — tap Share to save to Photos');
+    }
+  } else {
+    // Desktop: direct download
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    toast(`Video saved as ${a.download}`);
+  }
+
+  // Clean up after 60s
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  _vidChunks=[];_vidRecorder=null;
+
+  toast('🎬 Video exported! Check your Downloads or Files app.');
+}
+
+function cancelVideoExport(){
+  _vidPlaying=false;
+  if(_vidRaf) cancelAnimationFrame(_vidRaf);
+  if(_vidRecorder&&_vidRecorder.state!=='inactive') _vidRecorder.stop();
+  _vidRecorder=null;_vidChunks=[];
+  document.getElementById('vid-progress').style.display='none';
+  toast('Recording cancelled');
+  // Restore current playback state
+  drawScene(prog);
+}
+
+// ════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════
+let toastT=null;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+initModal();
+cx.fillStyle='#040a05';cx.fillRect(0,0,W,H);
+</script>
+</body>
+</html>
