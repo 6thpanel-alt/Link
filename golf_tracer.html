@@ -1566,6 +1566,7 @@ function startGPSTracking() {
 
   isMovingGPS = false;
   gpsPositions = [];
+  startCrashSave(); // begin periodic crash state saves
 
   gpsWatchId = navigator.geolocation.watchPosition(
     onGPSUpdate,
@@ -2988,20 +2989,260 @@ function showToast(msg) {
 }
 
 // ─── INIT ───
-// Show profile screen first
 drawAvatarPreview();
 renderCourseList();
 renderLoop();
 
-// Register service worker for offline PWA support
+// Register service worker
 if('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js', {scope: './'})
     .then(reg => console.log('LINKS SW registered:', reg.scope))
     .catch(err => console.log('LINKS SW failed (dev mode ok):', err));
 }
 
-// Wake Lock — keep screen on while on course
-// (Safari 16.4+ supports this; silently fails on older)
+// ═══════════════════════════════════════════════════════
+// ─── FIX 1: CRASH RECOVERY — granular mid-shot state ───
+// Saves enough state every 4 seconds so reopening the app
+// after any crash, kill, or backgrounding restores exactly
+// where the player was — including which hole, which shot
+// number, the current countdown state, and GPS origin.
+// ═══════════════════════════════════════════════════════
+
+const CRASH_KEY = 'links_crash_v1';
+
+function saveCrashState() {
+  if(!activeCourse || !tracking) return;
+  try {
+    const state = {
+      courseId:        activeCourse.id,
+      courseName:      activeCourse.name,
+      currentHoleIdx,
+      holeShotsMap,
+      scoreMap,
+      puttMap,
+      girMap,
+      playerPos,
+      playerTrail:     playerTrail.slice(-50), // last 50 pts is enough
+      gpsOrigin,
+      lastGPSPos,
+      tracking:        true,
+      ts:              Date.now()
+    };
+    localStorage.setItem(CRASH_KEY, JSON.stringify(state));
+  } catch(e) {}
+}
+
+function clearCrashState() {
+  localStorage.removeItem(CRASH_KEY);
+}
+
+function loadCrashState() {
+  try {
+    const raw = localStorage.getItem(CRASH_KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    // Only restore if less than 4 hours old (prevents stale recovery)
+    if(Date.now() - s.ts > 4 * 60 * 60 * 1000) {
+      clearCrashState();
+      return null;
+    }
+    return s;
+  } catch(e) { return null; }
+}
+
+// Save crash state every 4 seconds while tracking
+let crashSaveInterval = null;
+function startCrashSave() {
+  clearInterval(crashSaveInterval);
+  crashSaveInterval = setInterval(saveCrashState, 4000);
+}
+function stopCrashSave() {
+  clearInterval(crashSaveInterval);
+  crashSaveInterval = null;
+  clearCrashState();
+}
+
+// ─── CRASH RECOVERY CHECK ───
+// Called on startup — if a crash state exists from an active
+// tracking session, offer to restore it
+function checkForCrashRecovery() {
+  const s = loadCrashState();
+  if(!s) return;
+  const course = COURSES.find(c => c.id === s.courseId);
+  if(!course) { clearCrashState(); return; }
+
+  const holeShots = Object.values(s.holeShotsMap || {})
+    .flat().filter(x => !x.isPutt).length;
+  if(holeShots === 0) { clearCrashState(); return; }
+
+  const banner = document.createElement('div');
+  banner.id = 'crash-banner';
+  banner.style.cssText = `
+    position:absolute;inset:0;z-index:75;background:rgba(0,0,0,0.88);
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);
+  `;
+  banner.innerHTML = `
+    <div style="background:linear-gradient(160deg,#1a1208,#0f1a09);
+      border:1px solid rgba(232,130,61,0.4);border-radius:24px;
+      padding:28px 22px;width:340px;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">⚡</div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:900;
+        color:#e8ca6e;margin-bottom:6px">Round Recovered</div>
+      <div style="font-size:13px;color:rgba(240,237,228,0.55);margin-bottom:4px">
+        ${s.courseName}</div>
+      <div style="font-size:12px;color:rgba(240,237,228,0.35);margin-bottom:20px">
+        ${holeShots} shots · Hole ${(s.currentHoleIdx||0)+1}
+        · ${Math.round((Date.now()-s.ts)/60000)} min ago</div>
+      <button onclick="restoreFromCrash()" style="width:100%;padding:15px;border-radius:14px;
+        background:#c8a84b;border:none;color:#1a0f00;font-family:'Outfit',sans-serif;
+        font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+        cursor:pointer;margin-bottom:10px">Restore Round</button>
+      <button onclick="dismissCrashRecovery()" style="width:100%;padding:14px;border-radius:14px;
+        background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+        color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
+        font-weight:600;cursor:pointer">Start Fresh</button>
+    </div>
+  `;
+  document.getElementById('root').appendChild(banner);
+  window._crashState = s;
+  window._crashCourse = course;
+}
+
+function restoreFromCrash() {
+  const banner = document.getElementById('crash-banner');
+  if(banner) banner.remove();
+  const s = window._crashState;
+  const course = window._crashCourse;
+  if(!s || !course) return;
+
+  activeCourse = course;
+  currentHoleIdx  = s.currentHoleIdx  || 0;
+  holeShotsMap    = s.holeShotsMap    || {};
+  scoreMap        = s.scoreMap        || {};
+  puttMap         = s.puttMap         || {};
+  girMap          = s.girMap          || {};
+  playerPos       = s.playerPos       || {x:195,y:665};
+  playerTrail     = s.playerTrail     || [];
+  gpsOrigin       = s.gpsOrigin       || null;
+  lastGPSPos      = s.lastGPSPos      || null;
+  droppedPins     = [];
+  tracerList      = [];
+
+  document.getElementById('screen-courses').classList.add('hidden');
+  document.getElementById('screen-main').classList.remove('hidden');
+  document.getElementById('sc-course-name').textContent = activeCourse.name + ' · Round 1';
+
+  initHole();
+  buildHoleNav();
+  updateHUD();
+  buildScorecardTable();
+  renderShotsDrawer();
+
+  // Re-acquire GPS from last known position and restart watch
+  gpsReady = false;
+  document.getElementById('gps-dot').className = 'searching';
+  document.getElementById('gps-text').textContent = 'Re-acquiring GPS…';
+  initGPS();
+
+  // Restart tracking state
+  tracking = true;
+  const btn = document.getElementById('track-btn');
+  btn.classList.add('tracking');
+  btn.querySelector('.tb-icon').textContent = '⏹';
+  btn.querySelector('.tb-label').textContent = 'Stop';
+
+  startCrashSave();
+  showToast('⚡ Round restored — GPS re-acquiring');
+  clearCrashState(); // will be rewritten by startCrashSave
+}
+
+function dismissCrashRecovery() {
+  const banner = document.getElementById('crash-banner');
+  if(banner) banner.remove();
+  clearCrashState();
+}
+
+// Hook crash save into toggleTracking start/stop
+const _origToggleTracking = toggleTracking;
+function toggleTracking() {
+  _origToggleTracking();
+  // If we just started tracking, begin crash saves
+  if(tracking) startCrashSave();
+}
+
+const _origStopInternal = stopTrackingInternal;
+function stopTrackingInternal() {
+  _origStopInternal();
+  stopCrashSave();
+}
+
+// ═══════════════════════════════════════════════════════
+// ─── FIX 2: VISIBILITY CHANGE HANDLER ───
+// When the app comes back to the foreground after being
+// backgrounded (notification, call, lock screen), this
+// restores GPS, restarts the watch if tracking was active,
+// and re-acquires the wake lock.
+// ═══════════════════════════════════════════════════════
+
+let appWasTracking = false; // did we lose tracking while backgrounded?
+
+document.addEventListener('visibilitychange', async () => {
+  if(document.visibilityState === 'hidden') {
+    // App going to background — note current state
+    appWasTracking = tracking;
+    saveCrashState(); // force-save immediately before we lose control
+    return;
+  }
+
+  // ── App came back to foreground ──
+
+  // 1. Re-acquire wake lock (it gets released on visibilitychange)
+  if('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch(e) {}
+  }
+
+  // 2. If we were tracking when backgrounded, restart GPS watch
+  if(appWasTracking && tracking) {
+    // GPS watch may have been killed by Safari — restart it
+    if(gpsWatchId === null) {
+      document.getElementById('gps-dot').className = 'searching';
+      document.getElementById('gps-text').textContent = 'Re-acquiring GPS…';
+
+      // Clear any stale stop timer
+      if(stopTimer) { clearTimeout(stopTimer); stopTimer = null; }
+      isMovingGPS = false;
+
+      // Brief delay then restart watch
+      setTimeout(() => {
+        if(!tracking) return;
+        gpsWatchId = navigator.geolocation.watchPosition(
+          onGPSUpdate,
+          onGPSError,
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+        );
+        document.getElementById('gps-dot').className = 'red';
+        document.getElementById('gps-text').textContent = 'Tracking…';
+      }, 600);
+    }
+
+    // 3. Hide any stale countdown — it may have been mid-tick
+    // when backgrounded and the timer is now meaningless
+    const cdCard = document.getElementById('countdown-card');
+    if(cdCard.classList.contains('show')) {
+      clearInterval(cdInterval);
+      cdCard.classList.remove('show');
+      showToast('📍 Back — tap Log Now when you hit');
+    }
+
+    // 4. Brief toast so player knows the app recovered
+    showToast('📡 GPS restored — tracking resumed');
+  }
+});
+
+// ─── WAKE LOCK ───
 let wakeLock = null;
 async function requestWakeLock() {
   if('wakeLock' in navigator) {
@@ -3012,13 +3253,16 @@ async function requestWakeLock() {
   }
 }
 requestWakeLock();
-// Re-acquire wake lock when app becomes visible again
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') requestWakeLock();
-});
 
-// Check if there's a round in progress to resume
-setTimeout(checkForSavedRound, 800);
+// ─── STARTUP CHECKS ───
+// Check crash recovery before resume prompt — crash is more urgent
+setTimeout(() => {
+  checkForCrashRecovery();
+  // If no crash state, check for normal resume
+  if(!document.getElementById('crash-banner')) {
+    checkForSavedRound();
+  }
+}, 800);
 </script>
 </body>
 </html>
