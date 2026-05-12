@@ -13,8 +13,6 @@ Height — adjust with the slider (5'0" to 7'0")
 Dominant hand — Left or Right
 Build — Slim / Average / Stocky
 
-Tap Build My Avatar → when done. You can change these any time from the settings gear on the main tracker.
-Select a course
 Five courses are built in: Augusta National, Pebble Beach, St Andrews (Old Course), TPC Sawgrass, and Torrey Pines South.
 To search 40,000+ real courses:
 
