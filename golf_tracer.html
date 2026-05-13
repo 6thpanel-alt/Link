@@ -411,7 +411,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
 <div id="root">
 
 <!-- ─── PROFILE SETUP SCREEN ─── -->
-<div id="screen-profile" class="screen">
+<div id="screen-profile" class="screen hidden">
   <div id="profile-bg"></div>
   <div id="profile-inner">
     <div id="profile-logo">LINKS</div>
@@ -468,7 +468,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
 </div>
 
 <!-- ─── COURSE SELECT SCREEN ─── -->
-<div id="screen-courses" class="screen hidden">
+<div id="screen-courses" class="screen">
   <div id="cs-bg"></div>
   <div id="cs-header">
     <div style="display:flex;align-items:center;justify-content:space-between">
@@ -616,7 +616,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
     </div>
     <div id="pin-cursor" class=""><div class="pin-cursor-icon">📍</div></div>
     <!-- Avatar HUD mini -->
-    <div id="avatar-hud" onclick="replayLastSwing()">
+    <div id="avatar-hud" class="show" onclick="replayLastSwing()">
       <canvas id="avatar-hud-canvas" width="44" height="44"></canvas>
       <div id="avatar-hud-label">Tap replay</div>
     </div>
