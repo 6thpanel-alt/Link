@@ -55,6 +55,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
   cursor:pointer;letter-spacing:.4px;transition:all .18s;white-space:nowrap;user-select:none}
 .cb:active{opacity:.7}
 .cb.on{background:var(--gold);color:#1a0f00;letter-spacing:.5px}
+.dm-btn{transition:all .18s;user-select:none;display:inline-block}
+.dm-btn.on{background:var(--gold);color:#1a0f00 !important}
+.dm-btn:not(.on):active{opacity:.7}
 
 /* ── PLAYBACK PANEL ── */
 #pb{position:absolute;bottom:0;left:0;right:0;z-index:20;padding:10px 16px 36px;
@@ -193,6 +196,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
 <canvas id="cv" width="390" height="844"></canvas>
 
 <div id="top">
+  <div class="ib" onclick="location.href='index.html'" title="Library">←</div>
   <div class="ib" id="sum-btn" onclick="showSum()">📋</div>
   <div id="tc"><div id="tt">LINKS · Round Replay</div><div id="ts">Choose a round below</div></div>
   <div class="ib" id="vid-btn" onclick="startVideoExport()" title="Export video" style="display:none">🎬</div>
@@ -211,6 +215,22 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
   </div>
   <div id="scp"><div id="scpf"></div></div>
 </div>
+
+<div id="data-mode-toggle" style="position:absolute;z-index:20;bottom:270px;left:50%;
+  transform:translateX(-50%);display:none;background:rgba(4,12,5,0.78);border:1px solid var(--brd);
+  border-radius:20px;padding:3px;backdrop-filter:blur(20px);box-shadow:0 4px 24px rgba(0,0,0,0.5)">
+  <div class="dm-btn on" data-m="cinematic" onclick="setDataMode(this)" style="padding:5px 12px;
+    border-radius:18px;font-size:10px;font-weight:700;letter-spacing:.4px;cursor:pointer;
+    color:#1a0f00;background:var(--gold)">Cinematic</div>
+  <div class="dm-btn" data-m="truepath" onclick="setDataMode(this)" style="padding:5px 12px;
+    border-radius:18px;font-size:10px;font-weight:700;letter-spacing:.4px;cursor:pointer;
+    color:var(--mu)">📍 True Path</div>
+</div>
+<div id="sat-toggle" style="position:absolute;z-index:20;bottom:270px;left:calc(50% + 110px);
+  display:none;background:rgba(4,12,5,0.78);border:1px solid var(--brd);border-radius:18px;
+  padding:5px 10px;backdrop-filter:blur(20px);box-shadow:0 4px 24px rgba(0,0,0,0.5);
+  font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;color:var(--mu);
+  transition:all .18s;user-select:none" onclick="toggleSatellite()">🛰</div>
 
 <div id="cams">
   <div class="cb on" data-c="aerial" onclick="setCam(this)">Aerial</div>
@@ -370,6 +390,15 @@ const cv=document.getElementById('cv');
 const cx=cv.getContext('2d');
 let round=null,flat=[],si=0,prog=0,playing=false,cam='aerial';
 let lastT=null,spI=1,geomCache={};
+let dataMode='cinematic';            // 'cinematic' | 'truepath'
+const holeProjectors={};             // hN → projector function
+const holeProjectorsInv={};          // hN → inverse projector function
+// PHASE 3 satellite state
+let satelliteLayer=false;            // 🛰 toggle: paints real imagery under aerial bezier
+let satelliteImg=null;               // current hole's Image (or canvas) object, or null
+let satelliteImgHN=null;             // hN this image belongs to (avoids stale paints)
+let satelliteFetching=false;         // re-entrancy guard
+const tileMemCache={};               // hN → {dataUrl, bbox, z} for current round
 const SPEEDS=[0.25,0.5,1,1.5,2];
 const DUR=3200;
 const CAMS=['aerial','behind','side','hole'];
@@ -378,21 +407,62 @@ const TCOLS={high:'#e8823d',line:'#4ca8e8',low:'#5ab85e',ground:'#c8a84b',putt:'
 function tcol(s){return TCOLS[s.type]||'#eee';}
 
 // ════════════════════════════════════════
+// PHASE 4 — shape detection helpers
+// ════════════════════════════════════════
+function signedBearingDelta(a,b){ return ((a - b + 540) % 360) - 180; }
+function classifyShape(delta){
+  const abs = Math.abs(delta);
+  if (abs < 5)  return 'straight';
+  if (abs < 15) return delta < 0 ? 'draw' : 'fade';
+  return delta < 0 ? 'pull' : 'push';
+}
+function bearingBetween(lat1,lng1,lat2,lng2){
+  const φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+  const Δλ = (lng2-lng1)*Math.PI/180;
+  const y = Math.sin(Δλ)*Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return ((Math.atan2(y,x)*180/Math.PI) + 360) % 360;
+}
+function holeRefBearing(holeShots){
+  const approaches = holeShots.filter(s => !('putts' in s) && s.gpsStart && s.gpsEnd);
+  if (approaches.length === 0) return null;
+  const start = approaches[0].gpsStart;
+  const end   = approaches[approaches.length-1].gpsEnd;
+  if (!start || !end) return null;
+  return bearingBetween(start.lat, start.lng, end.lat, end.lng);
+}
+
+// ════════════════════════════════════════
 // FLATTEN
 // ════════════════════════════════════════
 function flatten(r){
   const f=[];
   r.holes.forEach(h=>{
+    const refBearing = holeRefBearing(h.shots);
     const app=h.shots.filter(s=>!('putts' in s));
     const pt=h.shots.find(s=>'putts' in s);
     let cumFrac=0; // cumulative hole fraction consumed so far
     app.forEach((s,i)=>{
       const shotFrac=s.yds/h.yds; // fraction of hole this shot covers
+
+      // ─── Shape detection (Phase 4) ───
+      let shape = null, shapeDelta = 0;
+      const haveGPS = s.bearing != null && refBearing != null;
+      const goodAcc = !s.gpsEnd?.accuracy || s.gpsEnd.accuracy <= 12;
+      const longEnough = s.yds >= 50;
+      if (haveGPS && goodAcc && longEnough && s.club !== 'PT') {
+        shapeDelta = signedBearingDelta(s.bearing, refBearing);
+        shape = classifyShape(shapeDelta);
+      } else if (haveGPS) {
+        shape = 'straight';
+      }
+
       f.push({...s,hN:h.n,hPar:h.par,hYds:h.yds,hName:h.name,
         hDog:h.dogleg||'none',hWater:!!h.water,sIn:i+1,isPutt:false,
         _startFrac:cumFrac,  // where on the hole this shot starts (0=tee,1=pin)
         _endFrac:Math.min(1,cumFrac+shotFrac),
-        _lat:((i*13+h.n*7+(r.id.charCodeAt?r.id.charCodeAt(0):1))%21-10)/10});
+        _lat:((i*13+h.n*7+(r.id.charCodeAt?r.id.charCodeAt(0):1))%21-10)/10,
+        shape, shapeDelta, _refBearing: refBearing});
       cumFrac=Math.min(1,cumFrac+shotFrac);
     });
     if(pt) for(let p=0;p<pt.putts;p++) f.push({
@@ -409,10 +479,44 @@ function flatten(r){
 // ════════════════════════════════════════
 // BALL PHYSICS — 3D parabolic
 // ════════════════════════════════════════
+const DIR_TO_DEG = { N:0, NE:45, E:90, SE:135, S:180, SW:225, W:270, NW:315 };
+
 function b3(t,s){
   const ah={high:0.48,line:0.20,low:0.09,ground:0.035,putt:0.01}[s.type]||0.18;
+
+  // ─── x: lateral curve ───
+  let x;
+  if (s.shape) {
+    const endLat = Math.tan((s.shapeDelta || 0) * Math.PI / 180) * s.yds;
+    const bowMag = s.yds * 0.04;
+    if (s.shape === 'draw') {
+      x = endLat * t - bowMag * Math.sin(Math.PI * t);
+    } else if (s.shape === 'fade') {
+      x = endLat * t + bowMag * Math.sin(Math.PI * t);
+    } else {
+      // straight, push, pull → linear angled flight
+      x = endLat * t;
+    }
+  } else {
+    // Legacy / no shape data — keep procedural sine curve
+    x = (s._lat || 0) * s.yds * 0.05 * Math.sin(Math.PI * t);
+  }
+
+  // ─── Wind drift (Phase 4) ───
+  if (window._roundWind && window._roundWind.mph > 0 && s._refBearing != null) {
+    const windDeg = DIR_TO_DEG[window._roundWind.direction];
+    if (windDeg != null) {
+      const cross = Math.sin((windDeg - s._refBearing) * Math.PI / 180) * window._roundWind.mph;
+      x += cross * 0.4 * Math.sin(Math.PI * t);
+    }
+  }
+
+  // Clamp extreme lateral — bad GPS can produce off-canvas flights
+  const maxLat = s.yds * 0.5;
+  x = Math.max(-maxLat, Math.min(maxLat, x));
+
   return{
-    x:(s._lat||0)*s.yds*0.05*Math.sin(Math.PI*t),
+    x,
     y:t*s.yds,
     z:s.yds*ah*Math.sin(Math.PI*t)
   };
@@ -565,8 +669,349 @@ function popViewport() {
 
 // PROJECT — aerial is ground truth; others derived
 
+// ── GPS PROJECTION (Phase 2) ──
+function makeHoleProjector(teeGPS, pinGPS, teeCanvas, pinCanvas) {
+  const cosLat = Math.cos(teeGPS.lat * Math.PI / 180);
+  const realDLat = (pinGPS.lat - teeGPS.lat) * 111320;
+  const realDLng = (pinGPS.lng - teeGPS.lng) * 111320 * cosLat;
+  const realDist = Math.hypot(realDLat, realDLng);
+  if (realDist < 1) return null;
+
+  const realBearing = Math.atan2(realDLng, realDLat);
+
+  const cdx = pinCanvas.x - teeCanvas.x;
+  const cdy = pinCanvas.y - teeCanvas.y;
+  const canvasDist = Math.hypot(cdx, cdy);
+  const canvasBearing = Math.atan2(cdx, -cdy);
+
+  const ppm = canvasDist / realDist;
+  const rotation = canvasBearing - realBearing;
+
+  const project = function (lat, lng) {
+    const dLat = (lat - teeGPS.lat) * 111320;
+    const dLng = (lng - teeGPS.lng) * 111320 * cosLat;
+    const r = Math.hypot(dLat, dLng);
+    if (r < 0.01) return { x: teeCanvas.x, y: teeCanvas.y };
+    const θ = Math.atan2(dLng, dLat) + rotation;
+    return {
+      x: teeCanvas.x + Math.sin(θ) * r * ppm,
+      y: teeCanvas.y - Math.cos(θ) * r * ppm
+    };
+  };
+
+  // PHASE 3: expose the affine matrix (x = a*lat + b*lng + e, y = c*lat + d*lng + f)
+  // Derived from sin(atan2(dLng,dLat)+rot)*r = dLng*cos(rot) + dLat*sin(rot), etc.
+  const k = ppm * 111320;
+  const a = k * Math.sin(rotation);
+  const b = k * cosLat * Math.cos(rotation);
+  const c = -k * Math.cos(rotation);
+  const d = k * cosLat * Math.sin(rotation);
+  const e = teeCanvas.x - a * teeGPS.lat - b * teeGPS.lng;
+  const f = teeCanvas.y - c * teeGPS.lat - d * teeGPS.lng;
+  project._aff = { a, b, c, d, e, f };
+  return project;
+}
+
+// ─── PHASE 3: tile math ───
+const TILE_URL = (z, y, x) =>
+  `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const TILE_SIZE = 256;
+const TILE_BUDGET_BYTES = 2_000_000;
+const TILE_LRU_KEY = 'links_tiles_lru';
+const tileCacheKey = (cid, hN) => `links_tiles_${cid || 'unknown'}_${hN}`;
+
+function lngLatToTileFloat(lng, lat, z) {
+  const n = Math.pow(2, z);
+  const x = (lng + 180) / 360 * n;
+  const latR = lat * Math.PI / 180;
+  const y = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
+  return { x, y };
+}
+
+function chooseZoom(bbox) {
+  for (let z = 19; z >= 16; z--) {
+    const tl = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const br = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const dx = Math.abs(br.x - tl.x), dy = Math.abs(br.y - tl.y);
+    if (Math.max(dx, dy) <= 4) return z;
+  }
+  return 16;
+}
+
+function loadTile(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('tile load failed: ' + url));
+    img.src = url;
+  });
+}
+
+function makeInverseProjector(a, b, c, d, e, f) {
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-12) return null;
+  return (x, y) => {
+    const dx = x - e, dy = y - f;
+    return {
+      lat: ( d * dx - b * dy) / det,
+      lng: (-c * dx + a * dy) / det
+    };
+  };
+}
+
+function bboxForHole(hN, canvasW, canvasH) {
+  const inv = holeProjectorsInv[hN];
+  if (!inv) return null;
+  const corners = [
+    inv(0, 0), inv(canvasW, 0),
+    inv(0, canvasH), inv(canvasW, canvasH)
+  ];
+  let west=Infinity, east=-Infinity, north=-Infinity, south=Infinity;
+  corners.forEach(c => {
+    if (c.lng < west)  west  = c.lng;
+    if (c.lng > east)  east  = c.lng;
+    if (c.lat > north) north = c.lat;
+    if (c.lat < south) south = c.lat;
+  });
+  const padX = (east - west) * 0.06, padY = (north - south) * 0.06;
+  return { west: west-padX, east: east+padX, north: north+padY, south: south-padY };
+}
+
+function bumpLRU(key) {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]').filter(k => k !== key);
+    lru.push(key);
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+function enforceTileBudget() {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]');
+    let total = 0;
+    const sizes = {};
+    lru.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) { sizes[k] = v.length; total += v.length; }
+    });
+    while (total > TILE_BUDGET_BYTES && lru.length > 1) {
+      const oldest = lru.shift();
+      total -= sizes[oldest] || 0;
+      localStorage.removeItem(oldest);
+    }
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+function evictOneTile() {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]');
+    const oldest = lru.shift();
+    if (oldest) localStorage.removeItem(oldest);
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+async function fetchHoleSatellite(courseId, hN) {
+  if (satelliteFetching) return null;
+  const key = tileCacheKey(courseId, hN);
+
+  if (tileMemCache[hN]) { bumpLRU(key); return tileMemCache[hN]; }
+
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const rec = JSON.parse(raw);
+      if (rec && rec.dataUrl && rec.bbox) {
+        tileMemCache[hN] = rec; bumpLRU(key); return rec;
+      }
+    }
+  } catch(e) {}
+
+  const bbox = bboxForHole(hN, cv.width, cv.height);
+  if (!bbox) return null;
+
+  satelliteFetching = true;
+  try {
+    const z = chooseZoom(bbox);
+    const tl = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const br = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const xMin = Math.floor(tl.x), xMax = Math.floor(br.x);
+    const yMin = Math.floor(tl.y), yMax = Math.floor(br.y);
+
+    const fetches = [];
+    for (let y = yMin; y <= yMax; y++) {
+      for (let x = xMin; x <= xMax; x++) {
+        fetches.push(loadTile(TILE_URL(z, y, x)).then(img => ({x, y, img})).catch(() => null));
+      }
+    }
+    const tiles = (await Promise.all(fetches)).filter(Boolean);
+    if (tiles.length === 0) return null;
+
+    const cnvW = (xMax - xMin + 1) * TILE_SIZE;
+    const cnvH = (yMax - yMin + 1) * TILE_SIZE;
+    const big = document.createElement('canvas');
+    big.width = cnvW; big.height = cnvH;
+    const bx = big.getContext('2d');
+    tiles.forEach(t => bx.drawImage(t.img, (t.x - xMin) * TILE_SIZE, (t.y - yMin) * TILE_SIZE));
+
+    const cropTL = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const cropBR = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const cx0 = (cropTL.x - xMin) * TILE_SIZE;
+    const cy0 = (cropTL.y - yMin) * TILE_SIZE;
+    const cw  = (cropBR.x - cropTL.x) * TILE_SIZE;
+    const ch  = (cropBR.y - cropTL.y) * TILE_SIZE;
+
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(cw));
+    out.height = Math.max(1, Math.round(ch));
+    out.getContext('2d').drawImage(big, cx0, cy0, cw, ch, 0, 0, out.width, out.height);
+
+    let dataUrl;
+    try {
+      dataUrl = out.toDataURL('image/jpeg', 0.72);
+    } catch (e) {
+      const rec = { dataUrl: null, _canvas: out, bbox, z, fetched: Date.now() };
+      tileMemCache[hN] = rec;
+      console.warn('Satellite canvas tainted — using in-memory tile only', e);
+      return rec;
+    }
+
+    const rec = { dataUrl, bbox, z, fetched: Date.now() };
+    tileMemCache[hN] = rec;
+    try {
+      localStorage.setItem(key, JSON.stringify(rec));
+      bumpLRU(key);
+      enforceTileBudget();
+    } catch (e) {
+      evictOneTile();
+      try { localStorage.setItem(key, JSON.stringify(rec)); bumpLRU(key); }
+      catch (_) { /* give up persisting; in-mem still works for this session */ }
+    }
+    return rec;
+  } catch (e) {
+    console.warn('Satellite fetch failed', e);
+    return null;
+  } finally {
+    satelliteFetching = false;
+  }
+}
+
+function attachGPSProjections(round, flatShots) {
+  Object.keys(holeProjectors).forEach(k => delete holeProjectors[k]);
+  Object.keys(holeProjectorsInv).forEach(k => delete holeProjectorsInv[k]);
+  Object.keys(tileMemCache).forEach(k => delete tileMemCache[k]);
+  flatShots.forEach(s => {
+    s._gpsStartCanvas = null;
+    s._gpsEndCanvas   = null;
+    s._truePathAvailable = false;
+  });
+
+  round.holes.forEach(h => {
+    const appShots = h.shots.filter(s => !('putts' in s));
+    const first = appShots[0];
+    const last  = appShots[appShots.length - 1];
+    if (!first?.gpsStart || !last?.gpsEnd) return;
+
+    const g = mkGeom(h.n, h.yds, h.dogleg || 'none', !!h.water, round.terrain || 'pines');
+    const proj = makeHoleProjector(
+      first.gpsStart, last.gpsEnd,
+      { x: g.teeX, y: g.teeY },
+      { x: g.pinX, y: g.pinY }
+    );
+    if (!proj) return;
+    holeProjectors[h.n] = proj;
+    if (proj._aff) {
+      const { a, b, c, d, e, f } = proj._aff;
+      holeProjectorsInv[h.n] = makeInverseProjector(a, b, c, d, e, f);
+    }
+
+    const holeFlatShots = flatShots.filter(fs => fs.hN === h.n && !fs.isPutt);
+    holeFlatShots.forEach(fs => {
+      if (fs.gpsStart) fs._gpsStartCanvas = proj(fs.gpsStart.lat, fs.gpsStart.lng);
+      if (fs.gpsEnd)   fs._gpsEndCanvas   = proj(fs.gpsEnd.lat,   fs.gpsEnd.lng);
+      fs._truePathAvailable = !!(fs._gpsStartCanvas && fs._gpsEndCanvas);
+    });
+  });
+
+  applyDataModeToFracs();
+}
+
+function roundHasGPS(flatShots) {
+  return flatShots.some(s => s._truePathAvailable);
+}
+
+function canvasToFracLat(pt, g) {
+  const dx = g.pinX - g.teeX;
+  const dy = g.pinY - g.teeY;
+  const total = Math.hypot(dx, dy);
+  if (total < 1) return { frac: 0, lat: 0 };
+  const ux = dx / total, uy = dy / total;
+  const px = -uy,        py = ux;
+  const vx = pt.x - g.teeX;
+  const vy = pt.y - g.teeY;
+  return {
+    frac: (vx*ux + vy*uy) / total,
+    lat:  (vx*px + vy*py) / total
+  };
+}
+
+function applyDataModeToFracs() {
+  flat.forEach(s => {
+    if (s._startFracOrig === undefined) {
+      s._startFracOrig = s._startFrac;
+      s._endFracOrig   = s._endFrac;
+      s._latOrig       = s._lat || 0;
+    }
+    if (dataMode === 'truepath' && s._truePathAvailable) {
+      const g = mkGeom(s.hN, s.hYds, s.hDog || 'none', s.hWater, round.terrain || 'pines');
+      const sFL = canvasToFracLat(s._gpsStartCanvas, g);
+      const eFL = canvasToFracLat(s._gpsEndCanvas,   g);
+      s._startFrac = Math.max(0, Math.min(1, sFL.frac));
+      s._endFrac   = Math.max(0, Math.min(1, eFL.frac));
+      s._lat       = (sFL.lat + eFL.lat) / 2;
+    } else {
+      s._startFrac = s._startFracOrig;
+      s._endFrac   = s._endFracOrig;
+      s._lat       = s._latOrig;
+    }
+  });
+}
+
+// PHASE 3: load satellite tile for the given hole if satelliteLayer is on
+async function refreshSatelliteForHole(hN) {
+  if (!satelliteLayer) { satelliteImg = null; satelliteImgHN = null; return; }
+  if (hN == null) return;
+  if (satelliteImgHN === hN && satelliteImg) return;
+  satelliteImg = null; satelliteImgHN = null;
+
+  const courseId = round && round.courseId;
+  const rec = await fetchHoleSatellite(courseId, hN);
+  if (!rec) return;
+
+  const curHN = flat[si] && flat[si].hN;
+  if (curHN !== hN || !satelliteLayer) return;
+
+  if (rec._canvas) {
+    satelliteImg = rec._canvas;
+    satelliteImgHN = hN;
+    drawScene(prog);
+  } else if (rec.dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      const curHN2 = flat[si] && flat[si].hN;
+      if (curHN2 !== hN || !satelliteLayer) return;
+      satelliteImg = img;
+      satelliteImgHN = hN;
+      drawScene(prog);
+    };
+    img.src = rec.dataUrl;
+  }
+}
+
 // Aerial: maps world position through the viewport
-function pAerial(p3, s, g) {
+function pAerialCinematic(p3, s, g) {
   const { x, y, z } = p3, d = Math.max(s.yds, 40);
   const frac = y / d;
   // Shot travels from startFrac to startFrac + shot/holeYds
@@ -577,6 +1022,18 @@ function pAerial(p3, s, g) {
   const aerialX = c.x + x * lateralSpread;
   const aerialY = g.teeY + holeFrac * (g.pinY - g.teeY) - z * 0.35;
   return { x: aerialX, y: aerialY };  // in full-hole aerial space; viewport applied by caller
+}
+
+function pAerial(p3, s, g) {
+  if (dataMode === 'truepath' && s._truePathAvailable) {
+    const t = s.yds ? p3.y / s.yds : 0;
+    const start = s._gpsStartCanvas, end = s._gpsEndCanvas;
+    return {
+      x: start.x + (end.x - start.x) * t + (p3.x || 0) * 0.35,
+      y: start.y + (end.y - start.y) * t - p3.z * 0.35
+    };
+  }
+  return pAerialCinematic(p3, s, g);
 }
 
 // Behind: perspective derived from aerial lane, camera at ball lie
@@ -713,6 +1170,16 @@ function drawAerial(t,s,g,th){
   // 2. Apply viewport transform — everything below here is in full-hole aerial coords
   pushViewport(vp);
 
+  // PHASE 3: paint satellite tile beneath everything (in world space, before terrain).
+  if (satelliteLayer && satelliteImg && satelliteImgHN === s.hN && holeProjectorsInv[s.hN]) {
+    const rec = tileMemCache[s.hN];
+    if (rec && rec.bbox) paintSatellite(cx, satelliteImg, rec.bbox, s.hN);
+  }
+
+  // PHASE 3: dim procedural terrain when satellite layer is on, so the photo reads through.
+  cx.save();
+  cx.globalAlpha = satelliteLayer ? 0.35 : 1.0;
+
   // Terrain noise (drawn in world space)
   const noiseStep=Math.ceil(5/vp.scale);// adapt to zoom
   for(let y=g.pinY-20;y<=g.teeY+20;y+=noiseStep){
@@ -768,6 +1235,8 @@ function drawAerial(t,s,g,th){
   // Trees as canopy — all of them (they line both sides of the whole hole)
   drawTreeCanopy(g,th);
 
+  cx.restore(); // PHASE 3: end procedural-terrain alpha block
+
   // Ball lie marker (where this shot starts)
   {
     const ballLieC=g.fwAt(vp.visStart);
@@ -796,6 +1265,7 @@ function drawAerial(t,s,g,th){
   cx.fillText('⛳ PIN',g.pinX,g.pinY-8/vp.scale);cx.textAlign='left';
 
   // Ball trail + ball (drawn in world space, viewport applied)
+  drawWalkTrail(g, vp);
   drawGhosts(t,s,'aerial',g);
   drawBallInWorldSpace(t,s,g,'aerial');
 
@@ -809,6 +1279,43 @@ function drawAerial(t,s,g,th){
     cx.fillStyle='rgba(200,168,75,.9)';cx.font='600 11px Outfit';cx.textAlign='center';
     cx.fillText(`${rem}y to pin`,W/2,H-36);cx.textAlign='left';
   }
+
+  // ─── Wind indicator (Phase 4) ───
+  if (round?.wind?.mph > 0 && round.wind.direction) {
+    const wx = W - 38, wy = 28;
+    const deg = DIR_TO_DEG[round.wind.direction] ?? 0;
+    cx.save();
+    cx.fillStyle = 'rgba(0,0,0,0.45)';
+    cx.fillRect(wx - 18, wy - 16, 50, 28);
+    cx.translate(wx - 6, wy);
+    cx.rotate((deg - 90) * Math.PI / 180);
+    cx.strokeStyle = '#80c0ff';
+    cx.lineWidth = 1.5;
+    cx.beginPath();
+    cx.moveTo(-7, 0); cx.lineTo(7, 0);
+    cx.moveTo(7, 0); cx.lineTo(3, -3); cx.moveTo(7, 0); cx.lineTo(3, 3);
+    cx.stroke();
+    cx.rotate(-(deg - 90) * Math.PI / 180);
+    cx.translate(-(wx - 6), -wy);
+    cx.fillStyle = '#80c0ff';
+    cx.font = '600 9px Outfit';
+    cx.fillText(`${round.wind.mph}mph`, wx + 4, wy + 3);
+    cx.restore();
+  }
+}
+
+// PHASE 3: paint a satellite image bbox onto the aerial canvas using the affine projector.
+function paintSatellite(cx, img, bbox, hN) {
+  const proj = holeProjectors[hN];
+  if (!proj) return;
+  const tl = proj(bbox.north, bbox.west);
+  const br = proj(bbox.south, bbox.east);
+  const x = Math.min(tl.x, br.x), y = Math.min(tl.y, br.y);
+  const w = Math.abs(br.x - tl.x), h = Math.abs(br.y - tl.y);
+  cx.save();
+  cx.beginPath(); cx.rect(0, 0, cv.width, cv.height); cx.clip();
+  cx.drawImage(img, x, y, w, h);
+  cx.restore();
 }
 
 // Draw ball trail in world (aerial) coordinates — viewport must be active
@@ -876,6 +1383,28 @@ function drawBehind(t,s,g,th){
     const screenX=vanishX+lateralOffset*sc;
     const screenY=H*0.67-worldDist*fov*0.062*sc;
     return{x:screenX,y:screenY,sc,worldDist};
+  }
+
+  // Approach ground plane — trapezoid receding from full-width at the bottom
+  // to a point at the green, to plant the green on a grass surface.
+  {
+    const pin2=aerialToBehind(g.pinX,g.pinY);
+    if(pin2){
+      const apexY=Math.max(pin2.y,GY-2);
+      cx.save();
+      cx.beginPath();
+      cx.moveTo(0,H);
+      cx.lineTo(W,H);
+      cx.lineTo(pin2.x+1.5,apexY);
+      cx.lineTo(pin2.x-1.5,apexY);
+      cx.closePath();
+      const pg=cx.createLinearGradient(0,apexY,0,H);
+      pg.addColorStop(0,th.fair3+'00');
+      pg.addColorStop(.45,th.fair2+'55');
+      pg.addColorStop(1,th.fair1+'88');
+      cx.fillStyle=pg;cx.fill();
+      cx.restore();
+    }
   }
 
   const{lPts,rPts,N,teeX,pinX,pinY}=g;
@@ -958,6 +1487,15 @@ function drawBehind(t,s,g,th){
     const gp=aerialToBehind(g.pinX,g.pinY);
     if(gp&&gp.y<GY){
       const sc2=Math.max(0.1,Math.min(1,1-gp.worldDist/s.hYds*.75));
+      // Soft elliptical ground shadow to plant the green
+      const shCy=gp.y+2*sc2;
+      const shRx=(g.fringeRx+20)*sc2;
+      const shRy=(g.fringeRy+12)*sc2*.5;
+      const shg=cx.createRadialGradient(gp.x,shCy,0,gp.x,shCy,Math.max(shRx,shRy));
+      shg.addColorStop(0,'rgba(0,0,0,.32)');
+      shg.addColorStop(1,'rgba(0,0,0,0)');
+      cx.fillStyle=shg;
+      cx.beginPath();cx.ellipse(gp.x,shCy,shRx,shRy,g.greenTilt,0,Math.PI*2);cx.fill();
       cx.fillStyle=th.fair3;
       cx.beginPath();cx.ellipse(gp.x,gp.y,(g.fringeRx+14)*sc2,(g.fringeRy+8)*sc2*.4,g.greenTilt,0,Math.PI*2);cx.fill();
       const grg=cx.createRadialGradient(gp.x,gp.y,0,gp.x,gp.y,g.fringeRx*sc2);
@@ -990,7 +1528,7 @@ function drawHorizonTrees(g,th,gy){
 function drawTreeWallBehind(trees,side,th,gy){
   const sorted=[...trees].sort((a,b)=>a.y-b.y);
   sorted.forEach(tr=>{
-    const xs=side==='left'?Math.min(tr.x+20,W*.45):Math.max(W-tr.x-20,W*.55);
+    const xs=side==='left'?Math.min(tr.x+20,W*.45):Math.min(tr.x,W-18);
     const depth=(H-tr.y)/(H-gy);// 0=far 1=close
     if(depth<0.05) return;
     const sc=Math.max(.3,depth);
@@ -1350,18 +1888,18 @@ function loop(now){
       upUI();upPB();drawScene(prog);
       setTimeout(showSum,400);return;
     }
-    if(flat[si].hN!==prevHole){holeFlash();}
+    if(flat[si].hN!==prevHole){holeFlash();refreshSatelliteForHole(flat[si].hN);}
     upUI();scrThumb();
   }
   upPB();drawScene(prog);
   rafId=requestAnimationFrame(loop);
 }
-function prev(){stop();si=Math.max(0,si-1);prog=0;upUI();upPB();scrThumb();drawScene(0);}
-function nxt(){stop();si=Math.min(flat.length-1,si+1);prog=0;upUI();upPB();scrThumb();drawScene(0);}
+function prev(){stop();si=Math.max(0,si-1);prog=0;upUI();upPB();scrThumb();drawScene(0);refreshSatelliteForHole(flat[si]?.hN);}
+function nxt(){stop();si=Math.min(flat.length-1,si+1);prog=0;upUI();upPB();scrThumb();drawScene(0);refreshSatelliteForHole(flat[si]?.hN);}
 function rew(){stop();prog=0;upPB();drawScene(0);}
 function stop(){playing=false;document.getElementById('plb').textContent='▶';if(rafId)cancelAnimationFrame(rafId);}
 function cyc(){spI=(spI+1)%SPEEDS.length;document.getElementById('spd').textContent=SPEEDS[spI]+'×';toast(`Speed ${SPEEDS[spI]}×`);}
-function jmp(i){stop();si=i;prog=0;upUI();upPB();scrThumb();drawScene(0);}
+function jmp(i){stop();si=i;prog=0;upUI();upPB();scrThumb();drawScene(0);refreshSatelliteForHole(flat[si]?.hN);}
 function holeFlash(){
   const f=document.getElementById('hole-flash');
   f.classList.add('flash');setTimeout(()=>f.classList.remove('flash'),320);
@@ -1371,8 +1909,8 @@ function holeFlash(){
 document.getElementById('pbb').addEventListener('click',scrub);
 document.getElementById('pbb').addEventListener('touchstart',e=>{e.preventDefault();scrubTouch(e);},{passive:false});
 document.getElementById('pbb').addEventListener('touchmove',e=>{e.preventDefault();scrubTouch(e);},{passive:false});
-function scrub(e){const r=e.currentTarget.getBoundingClientRect();prog=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));stop();upPB();drawScene(prog);}
-function scrubTouch(e){const r=e.currentTarget.getBoundingClientRect();const x=e.touches[0].clientX;prog=Math.max(0,Math.min(1,(x-r.left)/r.width));stop();upPB();drawScene(prog);}
+function scrub(e){const r=e.currentTarget.getBoundingClientRect();prog=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));stop();upPB();drawScene(prog);refreshSatelliteForHole(flat[si]?.hN);}
+function scrubTouch(e){const r=e.currentTarget.getBoundingClientRect();const x=e.touches[0].clientX;prog=Math.max(0,Math.min(1,(x-r.left)/r.width));stop();upPB();drawScene(prog);refreshSatelliteForHole(flat[si]?.hN);}
 
 function upPB(){
   const p=prog*100;
@@ -1382,11 +1920,51 @@ function upPB(){
 }
 
 // ════════════════════════════════════════
+// PHASE 4 — shape badge + elevation pip
+// ════════════════════════════════════════
+const SHAPE_META = {
+  straight: { icon: '→',  color: 'rgba(180,180,180,0.85)', bg: 'rgba(180,180,180,0.15)' },
+  draw:     { icon: '↪',  color: '#80c0ff',                bg: 'rgba(76,168,232,0.18)' },
+  fade:     { icon: '↩',  color: '#ffb366',                bg: 'rgba(232,150,76,0.18)' },
+  push:     { icon: '⇢',  color: '#e84c3d',                bg: 'rgba(232,76,61,0.18)' },
+  pull:     { icon: '⇠',  color: '#e84c3d',                bg: 'rgba(232,76,61,0.18)' }
+};
+function shapeBadgeHTML(s){
+  if (!s.shape) return '';
+  const m = SHAPE_META[s.shape]; if (!m) return '';
+  return ` <span style="display:inline-flex;align-items:center;gap:3px;`+
+    `background:${m.bg};border:1px solid ${m.color};border-radius:8px;`+
+    `padding:1px 5px;font-size:8px;font-weight:700;color:${m.color};`+
+    `margin-left:4px">${m.icon} ${s.shape.toUpperCase()}</span>`;
+}
+function elevationPipHTML(s){
+  if (!s.gpsStart?.altitude || !s.gpsEnd?.altitude) return '';
+  const dM = s.gpsEnd.altitude - s.gpsStart.altitude;
+  if (Math.abs(dM) < 1) return '';
+  const dFt = Math.round(dM * 3.281);
+  const arrow = dFt > 0 ? '↑' : '↓';
+  const color = dFt > 0 ? '#ffb366' : '#80c0ff';
+  return ` <span style="display:inline-flex;align-items:center;gap:2px;`+
+    `background:rgba(0,0,0,0.25);border:1px solid ${color};border-radius:8px;`+
+    `padding:1px 5px;font-size:8px;font-weight:700;color:${color};`+
+    `margin-left:4px">${arrow}${Math.abs(dFt)}ft</span>`;
+}
+
+// ════════════════════════════════════════
 // UI UPDATES
 // ════════════════════════════════════════
 function upUI(){
   const s=flat[si];if(!s) return;
-  document.getElementById('scl').textContent=`Shot ${si+1} of ${flat.length}`;
+  const hasGps = s.gpsStart && s.gpsEnd;
+  const isTP = dataMode === 'truepath' && s._truePathAvailable;
+  document.getElementById('scl').innerHTML = `Shot ${si+1} of ${flat.length}` +
+    (isTP
+      ? ` <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(76,168,232,0.18);border:1px solid rgba(76,168,232,0.35);border-radius:8px;padding:1px 5px;font-size:8px;font-weight:700;color:#80c0ff;margin-left:6px">📍 TRUE PATH</span>`
+      : hasGps
+      ? ` <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(58,170,60,0.15);border:1px solid rgba(58,170,60,0.3);border-radius:8px;padding:1px 5px;font-size:8px;font-weight:700;color:var(--teal);margin-left:6px">📍 GPS</span>`
+      : '') +
+    shapeBadgeHTML(s) +
+    elevationPipHTML(s);
   document.getElementById('sct').textContent=s.isPutt?`Putt · ${s.yds} ft`:`${CLUBS[s.club]||s.club} · ${s.yds} yds`;
   document.getElementById('scn').textContent=s.note||' ';
   document.getElementById('syds').textContent=s.yds;
@@ -1427,11 +2005,13 @@ function scrThumb(){
 function setCam(el){
   document.querySelectorAll('.cb').forEach(b=>b.classList.remove('on'));
   el.classList.add('on');cam=el.dataset.c;stop();drawScene(prog);
+  onCameraChanged();
 }
 function cycleCam(){
   const idx=CAMS.indexOf(cam);cam=CAMS[(idx+1)%CAMS.length];
   document.querySelectorAll('.cb').forEach(el=>el.classList.toggle('on',el.dataset.c===cam));
   stop();drawScene(prog);toast(`Camera: ${cam.charAt(0).toUpperCase()+cam.slice(1)}`);
+  onCameraChanged();
 }
 
 // ════════════════════════════════════════
@@ -1572,15 +2152,28 @@ function loadHistoryRound(key){
 function loadRound(id){
   round=ROUNDS.find(r=>r.id===id);
   if(!round) return;
+  window._roundWind = round.wind || { mph: 0, direction: null };
   flat=flatten(round);geomCache={};
+  attachGPSProjections(round, flat);
+  updateModeToggleVisibility();
   si=0;prog=0;playing=false;
   document.getElementById('lm').style.display='none';
   document.getElementById('tt').textContent=`LINKS · ${round.courseName}`;
   document.getElementById('ts').textContent=round.date||'';
+  if (round._isHighlight) {
+    const dateEl = document.getElementById('ts');
+    if (dateEl) {
+      dateEl.innerHTML = `<span style="background:linear-gradient(135deg,var(--gold),var(--gl));
+        color:#1a0f00;padding:2px 7px;border-radius:8px;font-weight:700;font-size:9px;
+        letter-spacing:.5px">🎬 HIGHLIGHTS</span>`;
+    }
+  }
   // Show video export button now that a round is loaded
   document.getElementById('vid-btn').style.display='flex';
   buildStrip();upUI();upPB();
   setTimeout(()=>{drawScene(0);toast('▶ Tap play to start replay');},80);
+  refreshSatelliteForHole(flat[0]?.hN);
+  onCameraChanged();
 }
 
 function loadCustom(){
@@ -1761,6 +2354,100 @@ function cancelVideoExport(){
 }
 
 // ════════════════════════════════════════
+// DATA MODE TOGGLE (Phase 2)
+// ════════════════════════════════════════
+function drawWalkTrail(g, vp) {
+  if (dataMode !== 'truepath' || !round) return;
+  const s = flat[si]; if (!s) return;
+  const hole = round.holes.find(h => h.n === s.hN);
+  if (!hole?.walkTrail?.length) return;
+  const proj = holeProjectors[s.hN]; if (!proj) return;
+
+  const pts = hole.walkTrail.map(p => proj(p.lat, p.lng));
+  if (pts.length < 2) return;
+
+  cx.save();
+  cx.strokeStyle = 'rgba(240,237,228,0.32)';
+  cx.lineWidth = 1.4 / vp.scale;
+  cx.setLineDash([3 / vp.scale, 5 / vp.scale]);
+  cx.beginPath();
+  cx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i].x, pts[i].y);
+  cx.stroke();
+  cx.setLineDash([]);
+  cx.fillStyle = 'rgba(240,237,228,0.5)';
+  cx.beginPath(); cx.arc(pts[0].x, pts[0].y, 2/vp.scale, 0, Math.PI*2); cx.fill();
+  cx.beginPath(); cx.arc(pts[pts.length-1].x, pts[pts.length-1].y, 2/vp.scale, 0, Math.PI*2); cx.fill();
+  cx.restore();
+}
+
+function setDataMode(el) {
+  document.querySelectorAll('.dm-btn').forEach(b => {
+    b.classList.remove('on');
+    b.style.background = 'transparent';
+    b.style.color = 'var(--mu)';
+  });
+  el.classList.add('on');
+  el.style.background = 'var(--gold)';
+  el.style.color = '#1a0f00';
+  dataMode = el.dataset.m;
+  applyDataModeToFracs();
+  geomCache = {};
+  stop();
+  drawScene(prog);
+  toast(dataMode === 'truepath' ? '📍 True Path' : '🎬 Cinematic');
+}
+
+function updateModeToggleVisibility() {
+  const has = roundHasGPS(flat);
+  document.getElementById('data-mode-toggle').style.display = has ? 'block' : 'none';
+  document.getElementById('sat-toggle').style.display       = has ? 'block' : 'none';
+  if (!has) {
+    if (dataMode === 'truepath') { dataMode = 'cinematic'; applyDataModeToFracs(); }
+    if (satelliteLayer) {
+      satelliteLayer = false; satelliteImg = null; satelliteImgHN = null;
+      const el = document.getElementById('sat-toggle');
+      if (el) { el.style.background = 'rgba(4,12,5,0.78)'; el.style.color = 'var(--mu)'; }
+    }
+  }
+}
+
+// PHASE 3: 🛰 toggle handler
+async function toggleSatellite() {
+  satelliteLayer = !satelliteLayer;
+  const el = document.getElementById('sat-toggle');
+  if (satelliteLayer) {
+    el.style.background = 'var(--gold)';
+    el.style.color = '#1a0f00';
+    toast('🛰 Loading satellite…');
+    await refreshSatelliteForHole(flat[si] && flat[si].hN);
+    if (!satelliteImg) {
+      satelliteLayer = false;
+      el.style.background = 'rgba(4,12,5,0.78)';
+      el.style.color = 'var(--mu)';
+      toast('Satellite unavailable for this hole');
+    } else {
+      toast('🛰 Satellite on');
+    }
+  } else {
+    el.style.background = 'rgba(4,12,5,0.78)';
+    el.style.color = 'var(--mu)';
+    satelliteImg = null; satelliteImgHN = null;
+    drawScene(prog);
+    toast('🛰 Satellite off');
+  }
+}
+
+// PHASE 3: dim the 🛰 chip on non-aerial cameras (satellite layer is aerial-only).
+function onCameraChanged() {
+  const sat = document.getElementById('sat-toggle');
+  if (!sat) return;
+  const aerial = (cam === 'aerial');
+  sat.style.opacity = aerial ? '1' : '0.35';
+  sat.style.pointerEvents = aerial ? 'auto' : 'none';
+}
+
+// ════════════════════════════════════════
 // TOAST
 // ════════════════════════════════════════
 let toastT=null;
@@ -1773,7 +2460,25 @@ function toast(msg){
 // ════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════
-initModal();
+const _urlParams = new URLSearchParams(location.search);
+const _urlId = _urlParams.get('id');
+if (_urlId) {
+  if (ROUNDS.find(r => r.id === _urlId)) {
+    loadRound(_urlId);
+  } else {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(HIST_PFX)) {
+        try {
+          const r = JSON.parse(localStorage.getItem(k));
+          if (r && r.id === _urlId) { loadHistoryRound(k); break; }
+        } catch (e) {}
+      }
+    }
+  }
+} else {
+  initModal();
+}
 cx.fillStyle='#040a05';cx.fillRect(0,0,W,H);
 </script>
 </body>

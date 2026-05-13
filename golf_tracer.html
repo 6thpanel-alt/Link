@@ -545,9 +545,21 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ou
     </div>
     <div style="position:absolute;top:190px;left:20px;right:20px;display:flex;gap:6px;pointer-events:all;overflow-x:auto" id="hole-nav"></div>
     <div id="pin-mode-banner" onclick="cancelPinMode()">📍 Tap map to place pin — tap here to cancel</div>
+    <div id="caddie-chip" onclick="useCaddieSuggestion()" style="position:absolute;bottom:340px;left:50%;
+      transform:translateX(-50%);display:none;background:rgba(4,12,5,0.86);
+      border:1px solid rgba(200,168,75,0.4);border-radius:14px;padding:7px 14px;
+      backdrop-filter:blur(20px);box-shadow:0 4px 20px rgba(0,0,0,0.5);font-size:11px;
+      font-weight:700;letter-spacing:.3px;color:#e8ca6e;cursor:pointer;user-select:none;
+      pointer-events:all;z-index:25;white-space:nowrap;max-width:88%">
+      🎯 <span id="caddie-text">— · — </span>
+    </div>
     <div id="gps-status" style="bottom:310px">
       <div id="gps-dot" class="searching"></div>
       <span id="gps-text">Acquiring GPS…</span>
+      <div id="wind-chip" onclick="cycleWind()" style="display:inline-block;padding:4px 9px;
+        border-radius:12px;background:rgba(76,168,232,0.15);border:1px solid rgba(76,168,232,0.35);
+        color:#80c0ff;font-size:10px;font-weight:700;letter-spacing:.3px;cursor:pointer;
+        margin-left:6px;user-select:none;pointer-events:all">🌬 calm</div>
     </div>
     <div id="countdown-card">
       <div id="cd-row">
@@ -884,6 +896,10 @@ let selectedTrajType = null;
 let selectedClubData = null;
 let animRaf = null;
 let gpsReady = false;
+let lastShotEndLatLng = null;   // GPS coords where the previous shot ended
+let caddieClub = null;          // current suggestion's club name, or null
+let caddieRemain = null;        // estimated remaining yards
+let caddieInsufficient = false; // when there's not enough data for a suggestion
 const RECENT = ['augusta','pebble'];
 
 // ─── FEATURES ROADMAP DATA ───
@@ -1148,6 +1164,7 @@ function selectCourse(id) {
   startNewRound();
 }
 function startNewRound() {
+  lastShotEndLatLng = null;
   currentHoleIdx = 0;
   holeShotsMap = {};
   scoreMap = {};
@@ -1170,14 +1187,14 @@ function startNewRound() {
   initGPS();
 }
 function showCourseSelect() {
-  if(tracking) { openStopModal(); return; }
-  document.getElementById('screen-main').classList.add('hidden');
-  document.getElementById('screen-courses').classList.remove('hidden');
+  if (tracking) { openStopModal(); return; }
+  window.location.href = 'index.html';
 }
 
 // ─── HOLE MANAGEMENT ───
 function currentHole() { return activeCourse.holes_data[currentHoleIdx]; }
 function initHole() {
+  lastShotEndLatLng = null;
   teePos = {x:195,y:665};
   playerPos = {...teePos};
   playerTrail = [playerPos];
@@ -1192,6 +1209,7 @@ function buildHoleNav() {
   const nav = document.getElementById('hole-nav');
   nav.innerHTML = activeCourse.holes_data.map((h,i)=>`
     <div class="hole-pill ${i===currentHoleIdx?'active':''}" onclick="jumpToHole(${i})">H${h.n}</div>`).join('');
+  updateCaddie();
 }
 function jumpToHole(idx) {
   if(tracking) { showToast('⏸ Stop tracking before switching holes'); return; }
@@ -1211,9 +1229,11 @@ function nextHole() {
     return;
   }
   advanceHole();
+  updateCaddie();
 }
 let pendingNextHole = false;
 function advanceHole() {
+  lastShotEndLatLng = null;
   pendingNextHole = false;
   if(currentHoleIdx < activeCourse.holes_data.length-1) {
     currentHoleIdx++;
@@ -1223,6 +1243,7 @@ function advanceHole() {
     updateHUD();
     buildScorecardTable();
     showToast(`⛳ Hole ${currentHole().n} — Par ${currentHole().par}`);
+    triggerSatellitePrefetch();   // PHASE 3: warm satellite cache for new hole
   } else {
     completeRound();
   }
@@ -1257,6 +1278,7 @@ function toggleTracking() {
   document.getElementById('gps-text').textContent = 'Tracking…';
   showToast('🟢 Tracking started');
   startGPSTracking();
+  updateCaddie();
 }
 function openStopModal() { document.getElementById('stop-modal').classList.add('show'); }
 function closeStopModal() { document.getElementById('stop-modal').classList.remove('show'); }
@@ -1291,6 +1313,7 @@ function stopTrackingInternal() {
   }
   showToast('⏹ Tracking stopped');
   saveRoundToStorage();
+  updateCaddie();
 }
 
 // ─── PUTT MODAL ───
@@ -1430,8 +1453,192 @@ function skipPutts() {
   showToast('Putts skipped for this hole');
 }
 // ═══════════════════════════════════════════════════════
+// ─── PHASE 3 (tracker mirror): tile helpers + prefetch ───
+// ═══════════════════════════════════════════════════════
+const TILE_URL = (z, y, x) =>
+  `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const TILE_SIZE = 256;
+const TILE_BUDGET_BYTES = 2_000_000;
+const TILE_LRU_KEY = 'links_tiles_lru';
+const tileCacheKey = (cid, hN) => `links_tiles_${cid || 'unknown'}_${hN}`;
+let prefetchInFlight = false;
+const prefetchedKeys = {};   // session-only — don't re-fetch the same key twice
+
+function lngLatToTileFloat(lng, lat, z) {
+  const n = Math.pow(2, z);
+  const x = (lng + 180) / 360 * n;
+  const latR = lat * Math.PI / 180;
+  const y = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
+  return { x, y };
+}
+
+function chooseZoom(bbox) {
+  for (let z = 19; z >= 16; z--) {
+    const tl = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const br = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const dx = Math.abs(br.x - tl.x), dy = Math.abs(br.y - tl.y);
+    if (Math.max(dx, dy) <= 4) return z;
+  }
+  return 16;
+}
+
+function loadTile(url) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('tile load failed: ' + url));
+    img.src = url;
+  });
+}
+
+function bumpLRU(key) {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]').filter(k => k !== key);
+    lru.push(key);
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+function enforceTileBudget() {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]');
+    let total = 0;
+    const sizes = {};
+    lru.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) { sizes[k] = v.length; total += v.length; }
+    });
+    while (total > TILE_BUDGET_BYTES && lru.length > 1) {
+      const oldest = lru.shift();
+      total -= sizes[oldest] || 0;
+      localStorage.removeItem(oldest);
+    }
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+function evictOneTile() {
+  try {
+    const lru = JSON.parse(localStorage.getItem(TILE_LRU_KEY) || '[]');
+    const oldest = lru.shift();
+    if (oldest) localStorage.removeItem(oldest);
+    localStorage.setItem(TILE_LRU_KEY, JSON.stringify(lru));
+  } catch (e) {}
+}
+
+// Slimmer fetcher used during tracking: takes an explicit bbox (no projector here).
+async function prefetchHoleSatellite(courseId, hN, bbox) {
+  if (prefetchInFlight) return;
+  if (!bbox) return;
+  const key = tileCacheKey(courseId, hN);
+  if (prefetchedKeys[key]) return;
+
+  // Skip if already cached
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const rec = JSON.parse(raw);
+      if (rec && rec.dataUrl) { prefetchedKeys[key] = true; bumpLRU(key); return; }
+    }
+  } catch (e) {}
+
+  prefetchInFlight = true;
+  try {
+    const z = chooseZoom(bbox);
+    const tl = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const br = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const xMin = Math.floor(tl.x), xMax = Math.floor(br.x);
+    const yMin = Math.floor(tl.y), yMax = Math.floor(br.y);
+
+    const fetches = [];
+    for (let y = yMin; y <= yMax; y++) {
+      for (let x = xMin; x <= xMax; x++) {
+        fetches.push(loadTile(TILE_URL(z, y, x)).then(img => ({x, y, img})).catch(() => null));
+      }
+    }
+    const tiles = (await Promise.all(fetches)).filter(Boolean);
+    if (tiles.length === 0) return;
+
+    const cnvW = (xMax - xMin + 1) * TILE_SIZE;
+    const cnvH = (yMax - yMin + 1) * TILE_SIZE;
+    const big = document.createElement('canvas');
+    big.width = cnvW; big.height = cnvH;
+    const bx = big.getContext('2d');
+    tiles.forEach(t => bx.drawImage(t.img, (t.x - xMin) * TILE_SIZE, (t.y - yMin) * TILE_SIZE));
+
+    const cropTL = lngLatToTileFloat(bbox.west, bbox.north, z);
+    const cropBR = lngLatToTileFloat(bbox.east, bbox.south, z);
+    const cx0 = (cropTL.x - xMin) * TILE_SIZE;
+    const cy0 = (cropTL.y - yMin) * TILE_SIZE;
+    const cw  = (cropBR.x - cropTL.x) * TILE_SIZE;
+    const ch  = (cropBR.y - cropTL.y) * TILE_SIZE;
+
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(cw));
+    out.height = Math.max(1, Math.round(ch));
+    out.getContext('2d').drawImage(big, cx0, cy0, cw, ch, 0, 0, out.width, out.height);
+
+    let dataUrl;
+    try { dataUrl = out.toDataURL('image/jpeg', 0.72); }
+    catch (e) { return; }  // tainted canvas — nothing to persist
+
+    const rec = { dataUrl, bbox, z, fetched: Date.now() };
+    try {
+      localStorage.setItem(key, JSON.stringify(rec));
+      bumpLRU(key);
+      enforceTileBudget();
+      prefetchedKeys[key] = true;
+    } catch (e) {
+      evictOneTile();
+      try { localStorage.setItem(key, JSON.stringify(rec)); bumpLRU(key); prefetchedKeys[key] = true; }
+      catch (_) {}
+    }
+  } catch (e) {
+    // swallow — prefetch must never affect tracking
+  } finally {
+    prefetchInFlight = false;
+  }
+}
+
+function triggerSatellitePrefetch() {
+  try {
+    if (!lastGPSPos || !activeCourse) return;
+    const padDeg = 0.0018; // ≈ 200m
+    const center = { lat: lastGPSPos.lat, lng: lastGPSPos.lng };
+    const bbox = {
+      west:  center.lng - padDeg, east:  center.lng + padDeg,
+      north: center.lat + padDeg, south: center.lat - padDeg
+    };
+    prefetchHoleSatellite(activeCourse.id, currentHole().n, bbox);
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════
 // ─── REAL GPS ENGINE ───
 // ═══════════════════════════════════════════════════════
+
+// ─── Phase 4: round-level wind ───
+let roundWind = { direction: null, mph: 0 };  // calm by default
+const WIND_CYCLE = [
+  { direction: null, mph: 0, label: '🌬 calm' },
+  { direction: 'N',  mph: 5,  label: '🌬 N 5' },
+  { direction: 'N',  mph: 10, label: '🌬 N 10' },
+  { direction: 'NE', mph: 15, label: '🌬 NE 15' },
+  { direction: 'E',  mph: 10, label: '🌬 E 10' },
+  { direction: 'S',  mph: 10, label: '🌬 S 10' },
+  { direction: 'W',  mph: 10, label: '🌬 W 10' },
+  { direction: 'NW', mph: 5,  label: '🌬 NW 5' }
+];
+let windCycleIdx = 0;
+function cycleWind() {
+  windCycleIdx = (windCycleIdx + 1) % WIND_CYCLE.length;
+  const w = WIND_CYCLE[windCycleIdx];
+  roundWind = { direction: w.direction, mph: w.mph };
+  const chip = document.getElementById('wind-chip');
+  if (chip) chip.textContent = w.label;
+  showToast(w.label);
+}
 
 // GPS state
 let gpsWatchId = null;
@@ -1482,6 +1689,106 @@ function distanceBetweenMetres(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+function bearingBetween(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δλ = (lng2 - lng1) * Math.PI/180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
+
+// ═══════════════════════════════════════════
+// PHASE 5 — AI CADDIE
+// ═══════════════════════════════════════════
+
+function estimateRemainingYds() {
+  if (!activeCourse) return null;
+  const h = currentHole();
+  if (!h) return null;
+  const prior = (holeShotsMap[currentHoleIdx] || []).reduce((a, s) => a + (s.yds || 0), 0);
+  return Math.max(0, Math.round(h.yds - prior));
+}
+
+function pickCaddieClub(remainingYds) {
+  if (remainingYds == null) return null;
+  if (remainingYds < 8) return { club: 'PT', avgYds: 0, stdDev: 0, gap: remainingYds, isPutt: true };
+
+  let clubs = {};
+  try { clubs = JSON.parse(localStorage.getItem('links_clubs_v1') || '{}'); } catch (e) {}
+  const candidates = Object.entries(clubs)
+    .filter(([c, d]) => c !== 'PT' && d.count >= 5 && d.avgYds)
+    .map(([c, d]) => ({
+      club: c,
+      avgYds: d.avgYds,
+      stdDev: d.stdDev || 0,
+      gap: Math.abs(d.avgYds - remainingYds)
+    }))
+    .sort((a, b) => a.gap - b.gap);
+  if (candidates.length === 0) return { insufficient: true };
+  return candidates[0];
+}
+
+function updateCaddie() {
+  const chip = document.getElementById('caddie-chip');
+  if (!tracking || !activeCourse) { chip.style.display = 'none'; return; }
+
+  const remain = estimateRemainingYds();
+  if (remain == null) { chip.style.display = 'none'; return; }
+
+  const pick = pickCaddieClub(remain);
+  caddieRemain = remain;
+
+  if (!pick) { chip.style.display = 'none'; return; }
+  if (pick.insufficient) {
+    caddieClub = null; caddieInsufficient = true;
+    document.getElementById('caddie-text').innerHTML =
+      `≈${remain}y · <span style="opacity:.7;font-weight:500">need more data</span>`;
+  } else if (pick.isPutt) {
+    caddieClub = 'PT'; caddieInsufficient = false;
+    document.getElementById('caddie-text').innerHTML =
+      `On the green · <span style="color:#80c0ff">⛳ putt</span>`;
+  } else {
+    caddieClub = pick.club; caddieInsufficient = false;
+    const dev = pick.stdDev > 0 ? ` ±${pick.stdDev}` : '';
+    document.getElementById('caddie-text').innerHTML =
+      `≈${remain}y · <span style="color:#9be39b">${pick.club}</span> (${pick.avgYds}${dev})`;
+  }
+  chip.style.display = 'block';
+}
+
+function useCaddieSuggestion() {
+  if (caddieInsufficient) {
+    showToast('🎯 Log more shots — caddie needs ≥5 per club');
+    return;
+  }
+  if (!caddieClub) return;
+  openShotModal();
+  // Defer one tick so the modal DOM is visible before we click into it
+  setTimeout(() => {
+    const btn = document.querySelector(`.club-btn[data-club="${caddieClub}"]`);
+    if (btn) selectClub(btn);
+  }, 60);
+}
+
+function updateClubStats(club, yards) {
+  if (!club || club === 'PT' || !yards || yards < 5) return;
+  try {
+    const data = JSON.parse(localStorage.getItem('links_clubs_v1') || '{}');
+    if (!data[club]) data[club] = { count: 0, totalYds: 0, samples: [], lastUpdated: 0 };
+    const c = data[club];
+    c.count++;
+    c.totalYds += yards;
+    c.avgYds = Math.round(c.totalYds / c.count);
+    c.samples.push(yards);
+    if (c.samples.length > 50) c.samples.shift();
+    const mean = c.avgYds;
+    const variance = c.samples.reduce((s, y) => s + (y - mean) ** 2, 0) / c.samples.length;
+    c.stdDev = Math.round(Math.sqrt(variance));
+    c.lastUpdated = Date.now();
+    localStorage.setItem('links_clubs_v1', JSON.stringify(data));
+  } catch (e) {}
+}
+
 // ─── GPS INIT — request permission and get first fix ───
 function initGPS() {
   if(!('geolocation' in navigator)) {
@@ -1500,6 +1807,8 @@ function initGPS() {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
         accuracy: pos.coords.accuracy,
+        altitude: pos.coords.altitude,
+        altitudeAccuracy: pos.coords.altitudeAccuracy,
         timestamp: pos.timestamp
       };
       gpsReady = true;
@@ -1510,6 +1819,7 @@ function initGPS() {
       // Save origin at tee for this hole
       setGPSOrigin(lastGPSPos.lat, lastGPSPos.lng);
       playerPos = latLngToCanvas(lastGPSPos.lat, lastGPSPos.lng);
+      triggerSatellitePrefetch();   // PHASE 3: warm satellite cache for current hole
     },
     err => {
       // Permission denied or unavailable
@@ -1603,7 +1913,12 @@ function onGPSUpdate(pos) {
     return;
   }
 
-  const newPos = {lat, lng, accuracy: acc, timestamp: ts};
+  const newPos = {
+    lat, lng, accuracy: acc,
+    altitude: pos.coords.altitude,
+    altitudeAccuracy: pos.coords.altitudeAccuracy,
+    timestamp: ts
+  };
 
   // Calculate movement from last position
   let distMoved = 0;
@@ -1764,54 +2079,84 @@ function savePositionToStorage(lat, lng, ts) {
 // Converts tracker holeShotsMap → the ROUNDS entry format the replay expects
 function serializeRoundForReplay() {
   const doglegForHole = (h) => {
-    // Use any stored dogleg, else guess from course name seed
     const seed = h.n * 7 + (activeCourse.id?.charCodeAt(0)||1);
     return ['right','left','none'][seed % 3];
   };
-  const waterCourses = ['pebble','beach','torrey','ocean','lake','creek','pond','water'];
-  const courseHasWater = waterCourses.some(w => activeCourse.name.toLowerCase().includes(w));
+  const courseHasWater = ['pebble','beach','torrey','ocean','lake','creek','pond','water']
+    .some(w => activeCourse.name.toLowerCase().includes(w));
+
+  // Read the raw trail once, group by hole index
+  let rawTrail = [];
+  try { rawTrail = JSON.parse(localStorage.getItem('links_trail_v1') || '[]'); } catch(e) {}
+  const trailByHole = {};
+  rawTrail.forEach(p => {
+    const k = p.hole;
+    if (k === undefined) return;
+    (trailByHole[k] = trailByHole[k] || []).push({ lat: p.lat, lng: p.lng, ts: p.ts });
+  });
+
+  function haversineMetres(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+              Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  function decimateTrail(points, minDistMetres = 3) {
+    if (!points || points.length < 2) return points || [];
+    const out = [points[0]];
+    let last = points[0];
+    for (let i = 1; i < points.length; i++) {
+      const p = points[i];
+      const d = haversineMetres(last.lat, last.lng, p.lat, p.lng);
+      if (d >= minDistMetres) { out.push(p); last = p; }
+    }
+    return out;
+  }
 
   const holes = activeCourse.holes_data.map((h, idx) => {
     const appShots = (holeShotsMap[idx] || []).filter(s => !s.isPutt);
-    const putts    = puttMap[idx] ?? 2;
-    const gir      = girMap[idx]  ?? false;
-
-    // Build shots array in replay format
+    const putts = puttMap[idx] ?? 2;
+    const gir = girMap[idx] ?? false;
     const shots = appShots.map(s => ({
       club: s.club,
       type: s.type === 'ground' ? 'ground' : s.type,
-      yds:  s.yds,
-      note: `${s.type.charAt(0).toUpperCase() + s.type.slice(1)} — ${s.club}`
+      yds: s.yds,
+      note: `${s.type.charAt(0).toUpperCase()+s.type.slice(1)} — ${s.club}`,
+      gpsStart: s.gpsStart || null,
+      gpsEnd:   s.gpsEnd   || null,
+      bearing:  s.bearing  ?? null,
+      timestamp:s.timestamp|| null
     }));
-    shots.push({ putts });
-
+    shots.push({ putts, gir });
     return {
-      n:      h.n,
-      par:    h.par,
-      yds:    h.yds,
-      name:   h.name || `Hole ${h.n}`,
+      n: h.n, par: h.par, yds: h.yds, name: h.name || `Hole ${h.n}`,
       dogleg: doglegForHole(h),
-      water:  courseHasWater && (idx % 3 === 0), // rough estimate
-      shots
+      water: courseHasWater && (idx % 3 === 0),
+      shots,
+      walkTrail: decimateTrail(trailByHole[idx])
     };
   });
 
-  const totalPar   = holes.reduce((a,h) => a + h.par, 0);
+  const totalPar = holes.reduce((a,h) => a + h.par, 0);
   const totalScore = Object.values(scoreMap).reduce((a,b) => a + b, 0);
-
-  // Pick terrain theme by course name
   const coastal = ['pebble','beach','torrey','ocean'].some(w => activeCourse.name.toLowerCase().includes(w));
-  const terrain = coastal ? 'coastal' : 'pines';
 
   return {
-    id:          `real_${Date.now()}`,
-    courseName:  activeCourse.name,
-    date:        new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+    id: `real_${Date.now()}`,
+    schemaVersion: 2,
+    courseName: activeCourse.name,
+    courseId: activeCourse.id,
+    date: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+    dateISO: new Date().toISOString(),
     totalPar,
-    score:       totalScore || totalPar,
-    terrain,
+    score: totalScore || totalPar,
+    terrain: coastal ? 'coastal' : 'pines',
+    wind: (roundWind.mph > 0) ? { direction: roundWind.direction, mph: roundWind.mph } : null,
     holes,
-    _trackedRound: true   // flag so history UI can show a badge
+    _trackedRound: true
   };
 }
 
@@ -1906,7 +2251,7 @@ function showRoundCompleteModal(r) {
         letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-bottom:10px">
         View Scorecard
       </button>
-      <button onclick="document.getElementById('round-complete-modal').remove();"
+      <button onclick="document.getElementById('round-complete-modal').remove();window.location.href='index.html';"
         style="width:100%;padding:14px;border-radius:14px;
         background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
         color:rgba(240,237,228,0.7);font-family:'Outfit',sans-serif;font-size:13px;
@@ -2052,6 +2397,7 @@ function setTimer(el) {
 
 // ─── SHOT MODAL ───
 function openShotModal() {
+  document.getElementById('caddie-chip').style.display = 'none';
   selectedTrajType = null; selectedClubData = null;
   document.querySelectorAll('.traj-btn,.club-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('confirm-btn').disabled = true;
@@ -2063,6 +2409,7 @@ function closeModal() {
   document.getElementById('gps-dot').className = '';
   document.getElementById('gps-text').textContent = 'Tracking…';
   if(tracking) setTimeout(()=>simulateMoveSegment(), 800);
+  updateCaddie();
 }
 function selectTraj(el) {
   document.querySelectorAll('.traj-btn').forEach(b=>b.classList.remove('sel'));
@@ -2133,39 +2480,61 @@ function drawPreviewArc() {
 
 // ─── CONFIRM SHOT ───
 function confirmShot() {
-  if(!selectedTrajType||!selectedClubData) return;
+  if (!selectedTrajType || !selectedClubData) return;
   document.getElementById('modal-backdrop').classList.remove('show');
   const fromPt = shots.length > 0 && holeShotsMap[currentHoleIdx]?.length > 0
     ? holeShotsMap[currentHoleIdx][holeShotsMap[currentHoleIdx].length-1].to
     : {...teePos};
   const toPt = {...playerPos};
   const distPx = Math.hypot(toPt.x-fromPt.x, toPt.y-fromPt.y);
-  const yds = selectedClubData.dist > 0 ? Math.round(selectedClubData.dist*(0.85+Math.random()*.3)) : Math.round(distPx*0.8);
+  const yds = selectedClubData.dist > 0
+    ? Math.round(selectedClubData.dist*(0.85+Math.random()*.3))
+    : Math.round(distPx*0.8);
+
+  const startGPS = lastShotEndLatLng
+    ? {...lastShotEndLatLng}
+    : (lastGPSPos
+        ? {lat:lastGPSPos.lat, lng:lastGPSPos.lng, altitude:lastGPSPos.altitude}
+        : null);
+  const endGPS = lastGPSPos
+    ? {lat:lastGPSPos.lat, lng:lastGPSPos.lng,
+       accuracy:lastGPSPos.accuracy, altitude:lastGPSPos.altitude}
+    : null;
+  const bearing = (startGPS && endGPS)
+    ? Math.round(bearingBetween(startGPS.lat, startGPS.lng, endGPS.lat, endGPS.lng))
+    : null;
+
   const shotObj = {
-    num:(holeShotsMap[currentHoleIdx]||[]).length+1,
-    type:selectedTrajType,
-    club:selectedClubData.club,
-    dist:selectedClubData.dist,
+    num: (holeShotsMap[currentHoleIdx]||[]).length+1,
+    type: selectedTrajType,
+    club: selectedClubData.club,
+    dist: selectedClubData.dist,
     yds,
-    from:{...fromPt},
-    to:{...toPt},
-    holeIdx:currentHoleIdx,
-    tracerPts:buildTracerPts(fromPt,toPt,selectedTrajType),
-    animProg:0
+    from: {...fromPt}, to: {...toPt},
+    holeIdx: currentHoleIdx,
+    tracerPts: buildTracerPts(fromPt, toPt, selectedTrajType),
+    animProg: 0,
+    gpsStart: startGPS, gpsEnd: endGPS, bearing,
+    timestamp: Date.now()
   };
-  if(!holeShotsMap[currentHoleIdx]) holeShotsMap[currentHoleIdx]=[];
+  if (!holeShotsMap[currentHoleIdx]) holeShotsMap[currentHoleIdx] = [];
   holeShotsMap[currentHoleIdx].push(shotObj);
   tracerList.push(shotObj);
   animateTracer(shotObj);
-  // Play swing avatar animation on map
-  setTimeout(()=>playSwingOnMap(shotObj), 100);
+  lastShotEndLatLng = endGPS
+    ? {lat:endGPS.lat, lng:endGPS.lng, altitude:endGPS.altitude}
+    : null;
+  updateClubStats(shotObj.club, yds);
+
+  setTimeout(() => playSwingOnMap(shotObj), 100);
   renderShotsDrawer();
   updateHUD();
-  document.getElementById('gps-dot').className='';
-  document.getElementById('gps-text').textContent='Tracking…';
+  document.getElementById('gps-dot').className = '';
+  document.getElementById('gps-text').textContent = 'Tracking…';
   showToast(`✅ Shot ${shotObj.num} logged — ${yds}y ${selectedClubData.club}`);
   saveRoundToStorage();
-  if(tracking) setTimeout(()=>simulateMoveSegment(), 1000);
+  if (tracking) setTimeout(() => simulateMoveSegment(), 1000);
+  updateCaddie();
 }
 
 // ─── TRACER ANIMATION ───
@@ -3025,6 +3394,7 @@ function saveCrashState() {
       playerTrail:     playerTrail.slice(-50), // last 50 pts is enough
       gpsOrigin,
       lastGPSPos,
+      roundWind,
       tracking:        true,
       ts:              Date.now()
     };
@@ -3125,6 +3495,13 @@ function restoreFromCrash() {
   playerTrail     = s.playerTrail     || [];
   gpsOrigin       = s.gpsOrigin       || null;
   lastGPSPos      = s.lastGPSPos      || null;
+  if (s.roundWind) {
+    roundWind = s.roundWind;
+    windCycleIdx = WIND_CYCLE.findIndex(w => w.direction === roundWind.direction && w.mph === roundWind.mph);
+    if (windCycleIdx < 0) windCycleIdx = 0;
+    const chip = document.getElementById('wind-chip');
+    if (chip) chip.textContent = WIND_CYCLE[windCycleIdx].label;
+  }
   droppedPins     = [];
   tracerList      = [];
 
