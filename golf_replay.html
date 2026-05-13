@@ -15,7 +15,24 @@
   --r:12px;--rl:20px
 }
 html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Outfit',sans-serif;color:var(--white)}
-#root{width:390px;height:844px;position:relative;margin:0 auto;overflow:hidden;border-radius:44px;background:#040a05}
+#root{
+  width:100%;
+  height:100vh;
+  height:100dvh;                              /* dynamic viewport — accounts for Safari chrome */
+  max-width:430px;                            /* still cap on tablets / desktop */
+  position:relative;
+  margin:0 auto;
+  background:var(--dark);
+  overflow:hidden;
+  padding-bottom:env(safe-area-inset-bottom); /* respect home indicator */
+}
+@media (min-width:431px){
+  #root{
+    border-radius:44px;
+    height:844px;                             /* desktop preview keeps the mockup look */
+    margin-top:max(0px,calc((100vh - 844px) / 2));
+  }
+}
 #cv{position:absolute;inset:0;z-index:1;touch-action:none}
 
 /* ── TOP BAR ── */
