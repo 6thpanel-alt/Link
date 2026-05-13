@@ -1,11 +1,13 @@
 // LINKS Golf Tracer — Service Worker v1.0
 // Caches the app shell for offline use on the course where there's no signal
 
-const CACHE = 'links-v1';
+const CACHE = 'links-v2';
 const OFFLINE_URLS = [
-  '/links/',
-  '/links/index.html',
-  '/links/manifest.json',
+  './',
+  './index.html',
+  './golf_tracer.html',
+  './golf_replay.html',
+  './manifest.json',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap'
 ];
 
@@ -42,6 +44,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return res;
-    })).catch(() => caches.match('/links/index.html'))
+    })).catch(() => caches.match('./index.html'))
   );
 });
